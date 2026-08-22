@@ -5,7 +5,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from sqlalchemy import select
+from app.models.student_model import Student
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.core.exceptions import APIException, success_response
@@ -94,6 +95,7 @@ from app.schemas.finance_schema import (
     StudentCategoryUpdate,
     StudentDashboardResponse,
     StudentScholarshipCreate,
+    SalaryCreate,
     StudentScholarshipResponse,
     StudentScholarshipUpdate,
 )
