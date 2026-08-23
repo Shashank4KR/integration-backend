@@ -23,8 +23,13 @@ from app.schemas.exam_schema import (
 from app.services.report_card_service import report_card_service
 from app.services.student_service import student_service
 
-router = build_crud_router(student_service, StudentCreate, StudentUpdate, StudentResponse)
-
+router = build_crud_router(
+    student_service,
+    StudentCreate,
+    StudentUpdate,
+    StudentResponse,
+    read_roles=("ADMIN", "TEACHER", "ACCOUNTANT"),
+)
 
 async def get_current_student(
     current_user: User = Depends(get_current_user),
