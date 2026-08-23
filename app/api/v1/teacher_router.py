@@ -207,11 +207,11 @@ async def get_teacher_performance(
     current_user: User = Depends(get_current_user),
 ):
     await _ensure_teacher_access(teacher_id, session, current_user)
-    from app.models.exam_result_model import ExamResult
     result = await session.execute(
         select(Class.id, Class.class_name, func.avg(ExamResult.marks_obtained).label("avg_marks"))
         .join(Timetable, Timetable.class_id == Class.id)
-        .join(ExamResult, ExamResult.class_id == Class.id)
+        .join(Exam, Exam.class_id == Class.id)
+        .join(ExamResult, ExamResult.exam_id == Exam.id)
         .where(Timetable.teacher_id == teacher_id)
         .group_by(Class.id, Class.class_name)
     )
@@ -224,7 +224,6 @@ async def get_teacher_performance(
         }
         for row in rows
     ]
-
 
 @router.get("/{teacher_id}/messages")
 async def get_teacher_messages(
