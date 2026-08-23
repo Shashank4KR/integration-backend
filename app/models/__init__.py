@@ -75,6 +75,13 @@ from .hostel_operations_model import (
     HostelSetting,
     HostelLeaveRequest,
 )
+from .academic_content_model import (
+    LessonPlan,
+    ContentResource,
+    ChapterNote,
+    StudentFeedback,
+)
 
 Faculty = Teacher
 StudentParent = ParentStudent
+
