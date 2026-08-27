@@ -80,9 +80,14 @@ async def get_class_teachers(class_id: UUID, session: AsyncSession = Depends(get
     return await class_service.get_class_teachers(session, class_id)
 
 
-@router.get("/{class_id}/students", response_model=list[ClassResponse])
+from app.schemas.student import StudentResponse
+from app.models.student_model import Student
+
+@router.get("/{class_id}/students", response_model=list[StudentResponse])
 async def get_class_students(class_id: UUID, session: AsyncSession = Depends(get_db)):
-    return await class_service.get_class_students(session, class_id)
+    result = await session.execute(select(Student).where(Student.class_id == class_id))
+    return result.scalars().all()
+
 
 
 @router.get("/{class_id}/timetable", response_model=list[TimetableResponse])

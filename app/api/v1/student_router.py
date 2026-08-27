@@ -52,6 +52,37 @@ async def get_current_student_profile(
     return student
 
 
+@router.get("/me/subjects", response_model=list[dict])
+async def get_current_student_subjects(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_db),
+):
+    from app.models.class_subject_model import ClassSubject
+    from app.models.subject_model import Subject
+
+    if student.class_id is None:
+        return []
+
+    result = await session.execute(
+        select(Subject)
+        .join(ClassSubject, ClassSubject.subject_id == Subject.id)
+        .where(ClassSubject.class_id == student.class_id)
+    )
+    subjects = result.scalars().all()
+    return [
+        {
+            "id": str(sub.id),
+            "subject_name": sub.subject_name,
+            "subject_code": sub.subject_code,
+            "class_name": student.class_.class_name if student.class_ else student.class_name,
+            "section": student.class_.section if student.class_ else None,
+            "academic_year": student.class_.academic_year if student.class_ else None,
+        }
+        for sub in subjects
+    ]
+
+
+
 @router.get("/me/timetable", response_model=list[dict])
 async def get_current_student_timetable(
     student: Student = Depends(get_current_student),
@@ -249,9 +280,9 @@ async def get_current_student_attendance(
     )
     records = result.scalars().all()
     total = len(records)
-    present = sum(1 for r in records if r.status == "PRESENT")
-    absent = sum(1 for r in records if r.status == "ABSENT")
-    late = sum(1 for r in records if r.status == "LATE")
+    present = sum(1 for r in records if (r.status.value if hasattr(r.status, "value") else str(r.status)) == "PRESENT")
+    absent = sum(1 for r in records if (r.status.value if hasattr(r.status, "value") else str(r.status)) == "ABSENT")
+    late = sum(1 for r in records if (r.status.value if hasattr(r.status, "value") else str(r.status)) == "LATE")
     percentage = (present / total * 100) if total > 0 else 0
     return {
         "total_classes": total,
@@ -259,7 +290,94 @@ async def get_current_student_attendance(
         "absent": absent,
         "late": late,
         "attendance_percentage": round(percentage, 2),
+        "records": [
+            {
+                "id": str(r.id),
+                "date": str(r.attendance_date),
+                "subject_id": str(r.subject_id),
+                "subject_name": r.subject.subject_name if r.subject else "N/A",
+                "period_no": r.period_no,
+                "status": r.status.value if hasattr(r.status, "value") else str(r.status),
+            }
+            for r in records
+        ],
     }
+
+
+@router.get("/me/transport", response_model=dict)
+async def get_current_student_transport(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_db),
+):
+    from app.models.transport_model import StudentTransport
+    result = await session.execute(
+        select(StudentTransport).where(StudentTransport.student_id == student.id)
+    )
+    st = result.scalar_one_or_none()
+    if st is None:
+        return {"assigned": False, "bus_number": None, "route_name": None, "stop_point": None}
+    bus = st.bus
+    route = st.route
+    return {
+        "assigned": True,
+        "bus_number": bus.bus_number if bus else None,
+        "bus_model": bus.model if bus else None,
+        "route_name": route.route_name if route else None,
+        "start_point": route.start_point if route else None,
+        "end_point": route.end_point if route else None,
+        "stop_point": st.stop_point,
+    }
+
+
+@router.post("/me/submit-assignment", response_model=dict)
+async def submit_assignment_for_me(
+    payload: dict,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_db),
+):
+    from app.models.assignment_model import AssignmentSubmission
+    from datetime import datetime, timezone
+
+    assignment_id_str = payload.get("assignment_id")
+    if not assignment_id_str:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="assignment_id is required")
+    assignment_id = UUID(assignment_id_str)
+    file_path = payload.get("file_path", "")
+
+    res = await session.execute(
+        select(AssignmentSubmission).where(
+            AssignmentSubmission.assignment_id == assignment_id,
+            AssignmentSubmission.student_id == student.id,
+        )
+    )
+    existing = res.scalar_one_or_none()
+    if existing:
+        existing.file_path = file_path
+        existing.submitted_on = datetime.now(timezone.utc)
+        await session.commit()
+        await session.refresh(existing)
+        sub = existing
+    else:
+        sub = AssignmentSubmission(
+            assignment_id=assignment_id,
+            student_id=student.id,
+            file_path=file_path,
+            submitted_on=datetime.now(timezone.utc),
+        )
+        session.add(sub)
+        await session.commit()
+        await session.refresh(sub)
+
+    return {
+        "id": str(sub.id),
+        "assignment_id": str(sub.assignment_id),
+        "student_id": str(sub.student_id),
+        "submitted_on": str(sub.submitted_on),
+        "file_path": sub.file_path,
+        "marks": float(sub.marks) if sub.marks is not None else None,
+        "remarks": sub.remarks,
+    }
+
 
 
 @router.get("/me/fees", response_model=dict)
