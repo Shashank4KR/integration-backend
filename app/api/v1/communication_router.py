@@ -107,8 +107,58 @@ async def delete_announcement(item_id: UUID, session: AsyncSession = Depends(get
 
 notification_router = APIRouter()
 @notification_router.post("", response_model=NotificationResponse, status_code=status.HTTP_201_CREATED)
-async def create_notification(payload: NotificationCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def create_notification(
+    payload: NotificationCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     _ensure_admin(current_user)
+    if payload.audience:
+        from app.models.role import Role
+        from app.models.user import User
+        from sqlalchemy import select
+        from fastapi import HTTPException
+
+        aud = payload.audience.upper()
+        if aud == "ALL":
+            result = await session.execute(select(User))
+            users = result.scalars().all()
+        else:
+            aud_map = {
+                "STUDENTS": ["STUDENT"],
+                "PARENTS": ["PARENT"],
+                "TEACHERS": ["TEACHER"],
+                "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"]
+            }
+            role_names = aud_map.get(aud, [])
+            if role_names:
+                role_result = await session.execute(select(Role).where(Role.role_name.in_(role_names)))
+                role_ids = [r.id for r in role_result.scalars().all()]
+                if role_ids:
+                    user_result = await session.execute(select(User).where(User.role_id.in_(role_ids)))
+                    users = user_result.scalars().all()
+                else:
+                    users = []
+            else:
+                users = []
+
+        if not users:
+            raise HTTPException(status_code=400, detail="No users found in targeted audience")
+
+        first_notif = None
+        for u in users:
+            notif_data = payload.model_dump(exclude_none=True)
+            notif_data["user_id"] = u.id
+            notif_data.pop("audience", None)
+            notif = await notification_service.create(session, notif_data)
+            if first_notif is None:
+                first_notif = notif
+        return first_notif
+    
+    if not payload.user_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="user_id is required when audience is not specified")
+
     return await notification_service.create(session, payload.model_dump(exclude_none=True))
 @notification_router.get("", response_model=list[NotificationResponse])
 async def get_notifications(

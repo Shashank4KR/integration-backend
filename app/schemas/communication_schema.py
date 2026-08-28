@@ -24,7 +24,8 @@ class AnnouncementResponse(AnnouncementCreate):
 
 
 class NotificationCreate(BaseModel):
-    user_id: UUID
+    user_id: UUID | None = None
+    audience: str | None = None
     title: str = Field(min_length=1, max_length=255)
     message: str = Field(min_length=1)
     sent_on: datetime | None = None
