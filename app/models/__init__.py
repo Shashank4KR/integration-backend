@@ -81,6 +81,7 @@ from .academic_content_model import (
     ChapterNote,
     StudentFeedback,
 )
+from .settings_model import SystemSetting
 
 Faculty = Teacher
 StudentParent = ParentStudent

@@ -29,6 +29,14 @@ class NotificationService(CRUDService):
         if await session.get(User, data["user_id"]) is None: raise HTTPException(status_code=400, detail="Notification user must be valid")
         return await super().create(session, data)
     async def mark_as_read(self, session, item_id): return await self.update(session, item_id, {"is_read": True})
+    async def mark_all_as_read(self, session, user_id):
+        from app.models.communication_model import Notification
+        from sqlalchemy import update
+        await session.execute(
+            update(Notification).where(Notification.user_id == user_id, Notification.is_read == False).values(is_read=True)
+        )
+        await session.commit()
+        return {"message": "All notifications marked as read"}
     async def get_notifications(self, session, user_id=None): return await self.repository.get_by_user(session, user_id) if user_id else await self.list(session)
 
 

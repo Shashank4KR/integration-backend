@@ -28,7 +28,7 @@ router = build_crud_router(
     StudentCreate,
     StudentUpdate,
     StudentResponse,
-    read_roles=("ADMIN", "TEACHER", "ACCOUNTANT"),
+    read_roles=("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"),
 )
 
 async def get_current_student(
@@ -385,31 +385,34 @@ async def get_current_student_fees(
     student: Student = Depends(get_current_student),
     session: AsyncSession = Depends(get_db),
 ):
-    from app.services.fee_service import fee_invoice_service, payment_service
+    from app.services.fee_service import fee_invoice_service, payment_service, _invoice_total_paid
 
     summary = await fee_invoice_service.get_student_fee_summary(session, student.id)
     invoices = await fee_invoice_service.get_by_student(session, student.id)
     outstanding_invoices = await fee_invoice_service.get_outstanding_by_student(session, student.id)
     payments = await payment_service.get_by_student(session, student.id)
 
+    formatted_invoices = []
+    for inv in invoices:
+        paid = float(await _invoice_total_paid(session, inv.id))
+        net = float(inv.net_amount if inv.net_amount else inv.amount)
+        formatted_invoices.append({
+            "id": str(inv.id),
+            "invoice_number": inv.invoice_number or f"INV-{inv.id}",
+            "amount": net,
+            "paid_amount": paid,
+            "pending_amount": max(0.0, net - paid),
+            "status": inv.status,
+            "due_date": str(inv.due_date) if inv.due_date else None,
+            "invoice_date": str(inv.invoice_date) if inv.invoice_date else None,
+        })
+
     return {
-        "total_fees": summary["total_fees"],
-        "paid_amount": summary["paid"],
-        "pending_amount": summary["pending"],
+        "total_fees": summary.get("total_fees", 0),
+        "paid_amount": summary.get("paid", 0),
+        "pending_amount": summary.get("pending", 0),
         "outstanding_invoices": len(outstanding_invoices),
-        "invoices": [
-            {
-                "id": str(inv.id),
-                "invoice_number": inv.invoice_number or f"INV-{inv.id}",
-                "amount": float(inv.net_amount if inv.net_amount else inv.amount),
-                "paid_amount": sum(float(p.amount_paid) for p in inv.payments),
-                "pending_amount": float(inv.net_amount if inv.net_amount else inv.amount) - sum(float(p.amount_paid) for p in inv.payments),
-                "status": inv.status,
-                "due_date": str(inv.due_date) if inv.due_date else None,
-                "invoice_date": str(inv.invoice_date) if inv.invoice_date else None,
-            }
-            for inv in invoices
-        ],
+        "invoices": formatted_invoices,
         "payment_history": [
             {
                 "payment_id": str(p.id),
@@ -418,9 +421,87 @@ async def get_current_student_fees(
                 "method": p.payment_method,
                 "receipt": p.receipt_number or p.receipt_no or "",
                 "status": p.payment_status,
+                "remarks": p.remarks or "",
             }
             for p in payments
         ],
+    }
+
+
+@router.get("/{student_id}/fee-invoices", response_model=list)
+async def get_student_fee_invoices(
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.fee_service import fee_invoice_service, _invoice_total_paid
+    invoices = await fee_invoice_service.get_by_student(session, student_id)
+    result = []
+    for inv in invoices:
+        paid = float(await _invoice_total_paid(session, inv.id))
+        net = float(inv.net_amount if inv.net_amount else inv.amount)
+        result.append({
+            "id": str(inv.id),
+            "invoiceNo": inv.invoice_number or f"INV-{str(inv.id)[:8]}",
+            "invoice_number": inv.invoice_number or f"INV-{str(inv.id)[:8]}",
+            "amount": net,
+            "paid": paid,
+            "paidAmount": paid,
+            "paid_amount": paid,
+            "balance": max(0.0, net - paid),
+            "pendingAmount": max(0.0, net - paid),
+            "status": inv.status,
+            "dueDate": str(inv.due_date) if inv.due_date else None,
+            "due_date": str(inv.due_date) if inv.due_date else None,
+            "date": str(inv.invoice_date) if inv.invoice_date else None,
+            "invoice_date": str(inv.invoice_date) if inv.invoice_date else None,
+        })
+    return result
+
+
+@router.get("/{student_id}/payments", response_model=list)
+async def get_student_payments(
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.fee_service import payment_service
+    payments = await payment_service.get_by_student(session, student_id)
+    return [
+        {
+            "id": str(p.id),
+            "payment_id": str(p.id),
+            "date": str(p.payment_date) if p.payment_date else None,
+            "payment_date": str(p.payment_date) if p.payment_date else None,
+            "amount": float(p.amount_paid),
+            "amount_paid": float(p.amount_paid),
+            "method": p.payment_method,
+            "payment_method": p.payment_method,
+            "receipt": p.receipt_number or p.receipt_no or "",
+            "receipt_number": p.receipt_number or p.receipt_no or "",
+            "status": p.payment_status,
+            "payment_status": p.payment_status,
+            "remarks": p.remarks or "",
+        }
+        for p in payments
+    ]
+
+
+@router.get("/{student_id}/fee-summary", response_model=dict)
+async def get_student_fee_summary_endpoint(
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.fee_service import fee_invoice_service
+    summary = await fee_invoice_service.get_student_fee_summary(session, student_id)
+    return {
+        "totalFees": summary.get("total_fees", 0),
+        "total_fees": summary.get("total_fees", 0),
+        "paidAmount": summary.get("paid", 0),
+        "paid_amount": summary.get("paid", 0),
+        "pendingAmount": summary.get("pending", 0),
+        "pending_amount": summary.get("pending", 0),
     }
 
 

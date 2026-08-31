@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth.routes import get_current_user
@@ -162,10 +162,11 @@ async def create_notification(
     return await notification_service.create(session, payload.model_dump(exclude_none=True))
 @notification_router.get("", response_model=list[NotificationResponse])
 async def get_notifications(
+    scope: str = Query("me", description="Scope of notifications: 'me' for user inbox, 'all' for admin system view"),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name == "ADMIN":
+    if scope == "all" and current_user.role and current_user.role.role_name == "ADMIN":
         return await notification_service.list(session)
     return await notification_service.get_notifications(session, current_user.id)
 @notification_router.get("/{item_id}", response_model=NotificationResponse)
@@ -183,16 +184,25 @@ async def delete_notification(item_id: UUID, session: AsyncSession = Depends(get
 async def mark_notification_read(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await notification_service.mark_as_read(session, item_id)
 
+@notification_router.post("/read-all")
+@notification_router.patch("/read-all")
+async def mark_all_notifications_read(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await notification_service.mark_all_as_read(session, current_user.id)
+
 message_router = APIRouter()
 @message_router.post("", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def send_message(payload: MessageCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await message_service.send_message(session, payload.model_dump(exclude_none=True))
 @message_router.get("", response_model=list[MessageResponse])
 async def get_messages(
+    scope: str = Query("me", description="Scope of messages: 'me' for personal inbox, 'all' for admin system view"),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name == "ADMIN":
+    if scope == "all" and current_user.role and current_user.role.role_name == "ADMIN":
         return await message_service.list(session)
     result = await session.execute(
         select(Message).where(

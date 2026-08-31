@@ -13,7 +13,7 @@ from app.models.student_model import Student
 from app.models.user import User
 from app.schemas.parent_schema import ParentCreate, ParentResponse, ParentUpdate
 from app.schemas.student_schema import StudentResponse
-from app.services.fee_service import fee_invoice_service, payment_service
+from app.services.fee_service import fee_invoice_service, payment_service, _invoice_total_paid
 from app.services.parent_service import parent_service
 
 router = build_crud_router(parent_service, ParentCreate, ParentUpdate, ParentResponse)
@@ -133,8 +133,8 @@ async def get_my_children_fees(
         invoice_list = []
         for inv in invoices:
             net = float(inv.net_amount if inv.net_amount else inv.amount)
-            paid = sum(float(p.amount_paid) for p in inv.payments)
-            balance = net - paid
+            paid = float(await _invoice_total_paid(session, inv.id))
+            balance = max(0.0, net - paid)
             if inv.status != "CANCELLED":
                 child_outstanding += balance
             invoice_list.append(

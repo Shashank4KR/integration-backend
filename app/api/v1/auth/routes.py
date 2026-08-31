@@ -160,3 +160,115 @@ async def read_users_me(
     current_user: User = Depends(get_current_user),
 ) -> User:
     return current_user
+
+
+@router.put("/profile", response_model=UserResponse)
+async def update_profile(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    new_username = payload.get("username")
+    new_email = payload.get("email")
+    new_phone = payload.get("phone")
+
+    if new_username and new_username != current_user.username:
+        result = await db.execute(
+            select(User).where(User.username == new_username, User.id != current_user.id)
+        )
+        if result.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username is already taken by another account",
+            )
+        current_user.username = new_username
+
+    if new_email and new_email != current_user.email:
+        result = await db.execute(
+            select(User).where(User.email == new_email, User.id != current_user.id)
+        )
+        if result.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email address is already in use by another account",
+            )
+        current_user.email = new_email
+
+    if new_phone is not None:
+        current_user.phone = new_phone
+
+    db.add(current_user)
+    await audit_log_service.create_log(
+        db,
+        {
+            "user_id": current_user.id,
+            "activity": "Profile Updated",
+            "details": "User updated personal profile details",
+        },
+        commit=False,
+    )
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.post("/change-password")
+async def change_password(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    current_password = payload.get("current_password")
+    new_password = payload.get("new_password")
+
+    if not current_password or not new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password and new password are required",
+        )
+
+    if not AuthService.verify_password(current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect current password",
+        )
+
+    if len(new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 6 characters long",
+        )
+
+    current_user.password_hash = AuthService.hash_password(new_password)
+    db.add(current_user)
+    await audit_log_service.create_log(
+        db,
+        {
+            "user_id": current_user.id,
+            "activity": "Password Changed",
+            "details": "User successfully changed their password",
+        },
+        commit=False,
+    )
+    await db.commit()
+    return {"message": "Password changed successfully"}
+
+
+@router.get("/sessions")
+async def get_my_sessions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    history = await login_history_service.get_user_history(db, current_user.id)
+    return [
+        {
+            "id": str(record.id),
+            "login_time": record.login_time.isoformat() if record.login_time else None,
+            "logout_time": record.logout_time.isoformat() if record.logout_time else None,
+            "device": record.device or "Browser on Desktop",
+            "ip_address": record.ip_address or "127.0.0.1",
+            "is_active": record.logout_time is None,
+        }
+        for record in history[:10]
+    ]
+

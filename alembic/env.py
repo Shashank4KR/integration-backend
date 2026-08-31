@@ -65,6 +65,7 @@ from app.models import (
     ApprovalStatus,
     RefundStatus,
     AssignmentStatus,
+    SystemSetting,
 )
 
 # this is the Alembic Config object, which provides

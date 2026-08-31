@@ -234,14 +234,17 @@ class BookIssueService(CRUDService):
         await session.commit()
         await session.refresh(issue)
 
-        student_user_id = await self._get_student_user_id(session, data["student_id"])
-        if student_user_id:
-            await notification_service.create(session, {
-                "user_id": student_user_id,
-                "title": "Book Issued",
-                "message": f"'{book.title}' has been issued to you. Due date: {data['due_date']}.",
-            }, commit=False)
-            await session.commit()
+        try:
+            student_user_id = await self._get_student_user_id(session, data["student_id"])
+            if student_user_id:
+                await notification_service.create(session, {
+                    "user_id": student_user_id,
+                    "title": "Book Issued",
+                    "message": f"'{book.title}' has been issued to you. Due date: {data['due_date']}.",
+                })
+                await session.commit()
+        except Exception:
+            pass
         return issue
 
     async def update_issue(self, session: AsyncSession, item_id: UUID, data: dict):
@@ -270,15 +273,18 @@ class BookIssueService(CRUDService):
         await session.commit()
         await session.refresh(issue)
 
-        student_user_id = await self._get_student_user_id(session, issue.student_id)
-        if student_user_id:
-            fine_msg = f" A fine of ₹{issue.fine_amount} was applied." if issue.fine_amount > 0 else ""
-            await notification_service.create(session, {
-                "user_id": student_user_id,
-                "title": "Book Returned",
-                "message": f"'{book.title}' has been successfully returned.{fine_msg}",
-            }, commit=False)
-            await session.commit()
+        try:
+            student_user_id = await self._get_student_user_id(session, issue.student_id)
+            if student_user_id:
+                fine_msg = f" A fine of ₹{issue.fine_amount} was applied." if issue.fine_amount > 0 else ""
+                await notification_service.create(session, {
+                    "user_id": student_user_id,
+                    "title": "Book Returned",
+                    "message": f"'{book.title}' has been successfully returned.{fine_msg}",
+                })
+                await session.commit()
+        except Exception:
+            pass
         return issue
 
     async def refresh_overdue(self, session: AsyncSession):
@@ -341,14 +347,17 @@ class BookIssueService(CRUDService):
         await session.commit()
         await session.refresh(payment)
 
-        student_user_id = await self._get_student_user_id(session, issue.student_id)
-        if student_user_id:
-            await notification_service.create(session, {
-                "user_id": student_user_id,
-                "title": "Fine Paid",
-                "message": f"A fine of ₹{amount} has been paid for '{issue.book.title if hasattr(issue, 'book') else 'a borrowed book'}'.",
-            }, commit=False)
-            await session.commit()
+        try:
+            student_user_id = await self._get_student_user_id(session, issue.student_id)
+            if student_user_id:
+                await notification_service.create(session, {
+                    "user_id": student_user_id,
+                    "title": "Fine Paid",
+                    "message": f"A fine of ₹{amount} has been paid for '{issue.book.title if hasattr(issue, 'book') else 'a borrowed book'}'.",
+                })
+                await session.commit()
+        except Exception:
+            pass
         return payment
 
     async def get_dashboard_analytics(self, session: AsyncSession) -> dict:
@@ -445,14 +454,17 @@ class BookReservationService(CRUDService):
         await session.commit()
         await session.refresh(reservation)
 
-        student_user_id = await self._get_student_user_id(session, data["student_id"])
-        if student_user_id:
-            await notification_service.create(session, {
-                "user_id": student_user_id,
-                "title": "Reservation Submitted",
-                "message": f"Your reservation for '{book.title}' has been submitted and is pending approval.",
-            }, commit=False)
-            await session.commit()
+        try:
+            student_user_id = await self._get_student_user_id(session, data["student_id"])
+            if student_user_id:
+                await notification_service.create(session, {
+                    "user_id": student_user_id,
+                    "title": "Reservation Submitted",
+                    "message": f"Your reservation for '{book.title}' has been submitted and is pending approval.",
+                })
+                await session.commit()
+        except Exception:
+            pass
         return reservation
 
     async def _has_active_reservation(self, session: AsyncSession, book_id: UUID, student_id: UUID) -> bool:
@@ -479,14 +491,17 @@ class BookReservationService(CRUDService):
         await session.commit()
         await session.refresh(reservation)
 
-        student_user_id = await self._get_student_user_id(session, reservation.student_id)
-        if student_user_id:
-            await notification_service.create(session, {
-                "user_id": student_user_id,
-                "title": "Reservation Approved",
-                "message": f"Your reservation for '{book.title}' has been approved. Please visit the library to collect the book.",
-            }, commit=False)
-            await session.commit()
+        try:
+            student_user_id = await self._get_student_user_id(session, reservation.student_id)
+            if student_user_id:
+                await notification_service.create(session, {
+                    "user_id": student_user_id,
+                    "title": "Reservation Approved",
+                    "message": f"Your reservation for '{book.title}' has been approved. Please visit the library to collect the book.",
+                })
+                await session.commit()
+        except Exception:
+            pass
         return reservation
 
     async def reject_reservation(self, session: AsyncSession, reservation_id: UUID, current_user: User):
@@ -499,15 +514,18 @@ class BookReservationService(CRUDService):
         await session.commit()
         await session.refresh(reservation)
 
-        student_user_id = await self._get_student_user_id(session, reservation.student_id)
-        if student_user_id:
-            book = await book_service.get_book(session, reservation.book_id)
-            await notification_service.create(session, {
-                "user_id": student_user_id,
-                "title": "Reservation Rejected",
-                "message": f"Your reservation for '{book.title}' has been rejected. Please contact the librarian for more information.",
-            }, commit=False)
-            await session.commit()
+        try:
+            student_user_id = await self._get_student_user_id(session, reservation.student_id)
+            if student_user_id:
+                book = await book_service.get_book(session, reservation.book_id)
+                await notification_service.create(session, {
+                    "user_id": student_user_id,
+                    "title": "Reservation Rejected",
+                    "message": f"Your reservation for '{book.title}' has been rejected. Please contact the librarian for more information.",
+                })
+                await session.commit()
+        except Exception:
+            pass
         return reservation
 
     async def cancel_reservation(self, session: AsyncSession, reservation_id: UUID, current_user: User):

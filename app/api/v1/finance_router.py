@@ -7,6 +7,10 @@ from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.student_model import Student
+from app.models.class_model import Class
+from app.models.parent_model import Parent
+from app.models.parent_student_model import ParentStudent
+from app.models.teacher_model import Teacher
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.core.exceptions import APIException, success_response
@@ -100,6 +104,7 @@ from app.schemas.finance_schema import (
     StudentScholarshipUpdate,
 )
 from app.services.fee_service import (
+    _invoice_total_paid,
     fee_invoice_service,
     fee_structure_service,
     payment_service,
@@ -309,9 +314,94 @@ async def list_invoices(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_accountant(current_user)
-    items = await fee_invoice_service.list(session)
-    return success_response(items)
+    role = (current_user.role.role_name if current_user.role else "STUDENT").upper()
+    if role in ("ADMIN", "SUPER_ADMIN", "ACCOUNTANT"):
+        items = await fee_invoice_service.list(session)
+    elif role == "STUDENT":
+        stud_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
+        stud = stud_res.scalar_one_or_none()
+        if not stud:
+            return success_response([])
+        items = await fee_invoice_service.get_by_student(session, stud.id)
+    elif role == "PARENT":
+        parent_res = await session.execute(select(Parent).where(Parent.user_id == current_user.id))
+        parent = parent_res.scalar_one_or_none()
+        if not parent:
+            return success_response([])
+        children_res = await session.execute(
+            select(Student.id).join(ParentStudent, ParentStudent.student_id == Student.id).where(ParentStudent.parent_id == parent.id)
+        )
+        child_ids = children_res.scalars().all()
+        if not child_ids:
+            return success_response([])
+        items_res = await session.execute(select(FeeInvoice).where(FeeInvoice.student_id.in_(child_ids)))
+        items = items_res.scalars().all()
+    elif role == "TEACHER":
+        teacher_res = await session.execute(select(Teacher).where(Teacher.user_id == current_user.id))
+        teacher = teacher_res.scalar_one_or_none()
+        if not teacher:
+            return success_response([])
+        classes_res = await session.execute(select(Class.id).where(Class.class_teacher_id == teacher.id))
+        class_ids = classes_res.scalars().all()
+        if not class_ids:
+            return success_response([])
+        students_res = await session.execute(select(Student.id).where(Student.class_id.in_(class_ids)))
+        student_ids = students_res.scalars().all()
+        if not student_ids:
+            return success_response([])
+        items_res = await session.execute(select(FeeInvoice).where(FeeInvoice.student_id.in_(student_ids)))
+        items = items_res.scalars().all()
+    else:
+        items = []
+
+    result = []
+    for item in items:
+        total_paid = float(await _invoice_total_paid(session, item.id))
+        net = float(item.net_amount if item.net_amount is not None else item.amount)
+        bal = max(0.0, net - total_paid)
+        student = await session.get(Student, item.student_id)
+        student_name = f"{student.first_name or ''} {student.last_name or ''}".strip() if student else "Student"
+        student_adm = student.admission_no if student else str(item.student_id)
+        fee_struct = await session.get(FeeStructure, item.fee_type_id)
+        fee_type_name = fee_struct.fee_type if fee_struct else "Fee Invoice"
+
+        class_grade = ""
+        if student:
+            if student.class_name:
+                class_grade = student.class_name
+            elif student.class_id:
+                cls_obj = await session.get(Class, student.class_id)
+                if cls_obj:
+                    class_grade = f"{cls_obj.class_name} - {cls_obj.section}".strip()
+            elif student.class_:
+                class_grade = f"{student.class_.class_name} - {student.class_.section}".strip()
+        if not class_grade and fee_struct:
+            if fee_struct.class_id:
+                cls_obj = await session.get(Class, fee_struct.class_id)
+                if cls_obj:
+                    class_grade = f"{cls_obj.class_name} - {cls_obj.section}".strip()
+            elif fee_struct.section:
+                class_grade = fee_struct.section
+        if not class_grade:
+            class_grade = "General"
+
+        result.append({
+            "id": str(item.id),
+            "invoice_number": item.invoice_number,
+            "invoice_date": str(item.invoice_date),
+            "due_date": str(item.due_date),
+            "amount": float(item.amount),
+            "net_amount": net,
+            "paid": total_paid,
+            "balance": bal,
+            "status": item.status,
+            "student_id": student_adm,
+            "student_name": student_name,
+            "class_grade": class_grade,
+            "fee_type_id": str(item.fee_type_id),
+            "fee_type": fee_type_name,
+        })
+    return success_response(result)
 
 
 @finance_router.get("/invoices/{item_id}")
@@ -320,9 +410,71 @@ async def get_invoice(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_accountant(current_user)
     item = await fee_invoice_service.get(session, item_id)
-    return success_response(item)
+    role = (current_user.role.role_name if current_user.role else "STUDENT").upper()
+    if role not in ("ADMIN", "SUPER_ADMIN", "ACCOUNTANT"):
+        # verify student / parent ownership
+        if role == "STUDENT":
+            stud_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
+            stud = stud_res.scalar_one_or_none()
+            if not stud or item.student_id != stud.id:
+                raise APIException(status_code=status.HTTP_403_FORBIDDEN, message="Not authorized to view this invoice")
+        elif role == "PARENT":
+            parent_res = await session.execute(select(Parent).where(Parent.user_id == current_user.id))
+            parent = parent_res.scalar_one_or_none()
+            if not parent:
+                raise APIException(status_code=status.HTTP_403_FORBIDDEN, message="Not authorized to view this invoice")
+            rel_res = await session.execute(
+                select(ParentStudent).where(ParentStudent.parent_id == parent.id, ParentStudent.student_id == item.student_id)
+            )
+            if not rel_res.scalar_one_or_none():
+                raise APIException(status_code=status.HTTP_403_FORBIDDEN, message="Not authorized to view this invoice")
+
+    total_paid = float(await _invoice_total_paid(session, item.id))
+    net = float(item.net_amount if item.net_amount is not None else item.amount)
+    bal = max(0.0, net - total_paid)
+    student = await session.get(Student, item.student_id)
+    student_name = f"{student.first_name or ''} {student.last_name or ''}".strip() if student else "Student"
+    student_adm = student.admission_no if student else str(item.student_id)
+    fee_struct = await session.get(FeeStructure, item.fee_type_id)
+    fee_type_name = fee_struct.fee_type if fee_struct else "Fee Invoice"
+
+    class_grade = ""
+    if student:
+        if student.class_name:
+            class_grade = student.class_name
+        elif student.class_id:
+            cls_obj = await session.get(Class, student.class_id)
+            if cls_obj:
+                class_grade = f"{cls_obj.class_name} - {cls_obj.section}".strip()
+        elif student.class_:
+            class_grade = f"{student.class_.class_name} - {student.class_.section}".strip()
+    if not class_grade and fee_struct:
+        if fee_struct.class_id:
+            cls_obj = await session.get(Class, fee_struct.class_id)
+            if cls_obj:
+                class_grade = f"{cls_obj.class_name} - {cls_obj.section}".strip()
+        elif fee_struct.section:
+            class_grade = fee_struct.section
+    if not class_grade:
+        class_grade = "General"
+
+    return success_response({
+        "id": str(item.id),
+        "invoice_number": item.invoice_number,
+        "invoice_date": str(item.invoice_date),
+        "due_date": str(item.due_date),
+        "amount": float(item.amount),
+        "net_amount": net,
+        "paid": total_paid,
+        "balance": bal,
+        "status": item.status,
+        "student_id": student_adm,
+        "student_name": student_name,
+        "class_grade": class_grade,
+        "fee_type_id": str(item.fee_type_id),
+        "fee_type": fee_type_name,
+    })
 
 
 @finance_router.post("/invoices/generate", status_code=status.HTTP_201_CREATED)
@@ -332,8 +484,68 @@ async def generate_invoice(
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin_or_accountant(current_user)
-    item = await fee_invoice_service.create(session, payload.model_dump())
+    data = payload.model_dump()
+    item = await fee_invoice_service.create(session, data)
     return success_response(item, message="Invoice generated successfully")
+
+
+@finance_router.put("/invoices/{item_id}")
+async def update_invoice(
+    item_id: UUID,
+    payload: FeeInvoiceUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await fee_invoice_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Invoice updated successfully")
+
+
+@finance_router.delete("/invoices/{item_id}")
+async def delete_invoice(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    await fee_invoice_service.delete(session, item_id)
+    return success_response(message="Invoice deleted successfully")
+
+
+# Payments
+@finance_router.get("/payments")
+async def list_payments(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await payment_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/payments", status_code=status.HTTP_201_CREATED)
+async def create_payment(
+    payload: PaymentCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = payload.model_dump()
+    method_str = str(data.get("payment_method", "ONLINE")).upper().replace(" ", "_").replace("/", "_")
+    if "UPI" in method_str:
+        data["payment_method"] = "UPI"
+    elif "CASH" in method_str:
+        data["payment_method"] = "CASH"
+    elif "CARD" in method_str:
+        data["payment_method"] = "CARD"
+    elif "CHEQUE" in method_str:
+        data["payment_method"] = "CHEQUE"
+    elif "BANK" in method_str or "NET" in method_str:
+        data["payment_method"] = "BANK_TRANSFER"
+    else:
+        data["payment_method"] = "ONLINE"
+    item = await payment_service.create(session, data)
+    return success_response(item, message="Payment recorded successfully")
 
 
 # Student Categories

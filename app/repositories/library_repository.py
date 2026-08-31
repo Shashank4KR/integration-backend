@@ -359,7 +359,7 @@ class LibrarySettingsRepository(CRUDRepository[LibrarySettings]):
     async def get_or_create(self, session: AsyncSession):
         settings = await self.get_settings(session)
         if settings is None:
-            settings = await self.repository.create(session, {
+            settings = await self.create(session, {
                 "max_books_per_student": 5,
                 "fine_per_day": Decimal("10.00"),
                 "reservation_limit": 3,

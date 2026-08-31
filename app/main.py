@@ -60,10 +60,14 @@ from app.api.v1.hostel_complaint_router import hostel_complaint_router
 from app.api.v1.hostel_notice_router import hostel_notice_router
 from app.api.v1.hostel_setting_router import hostel_setting_router
 from app.api.v1.hostel_leave_router import hostel_leave_router
+from app.api.v1.settings_router import settings_router
+from app.core.database import Base, engine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
 
 
@@ -229,6 +233,7 @@ app.include_router(hostel_extra_router, prefix="/hostel", tags=["Hostel"])
 app.include_router(hostel_complaint_router, prefix="/hostel-complaints", tags=["Hostel Complaints"])
 app.include_router(hostel_notice_router, prefix="/hostel-notices", tags=["Hostel Notices"])
 app.include_router(hostel_setting_router, prefix="/hostel-settings", tags=["Hostel Settings"])
+app.include_router(settings_router, prefix="/settings", tags=["Settings"])
 from app.api.v1.academic_content_router import router as academic_content_router
 
 app.include_router(academic_content_router, prefix="", tags=["Academic Content"])
