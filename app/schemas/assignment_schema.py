@@ -29,6 +29,8 @@ class AssignmentResponse(AssignmentCreate):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    class_name: str | None = None
+    subject_name: str | None = None
 
 
 class AssignmentSubmissionCreate(BaseModel):
@@ -58,6 +60,7 @@ class AssignmentSubmissionResponse(BaseModel):
     remarks: str | None
     created_at: datetime
     updated_at: datetime
+    student_name: str | None = None
 
 
 class AssignmentSummaryResponse(BaseModel):
