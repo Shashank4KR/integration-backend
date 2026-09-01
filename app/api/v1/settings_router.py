@@ -24,6 +24,16 @@ def _ensure_admin_or_privileged(user: User) -> None:
         )
 
 
+@settings_router.get("/public/system-status")
+async def get_system_status(
+    session: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    system_settings = await settings_service.get_category_settings(session, "system")
+    return {
+        "maintenance_mode": bool(system_settings.get("maintenance_mode", False)),
+    }
+
+
 @settings_router.get("", response_model=dict[str, Any])
 async def get_all_settings(
     session: AsyncSession = Depends(get_db),

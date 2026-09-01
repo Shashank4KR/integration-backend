@@ -46,6 +46,21 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
+    role_name = (user.role.role_name if user.role else "").upper()
+    if role_name != "ADMIN":
+        try:
+            from app.services.settings_service import settings_service
+            system_settings = await settings_service.get_category_settings(db, "system")
+            if bool(system_settings.get("maintenance_mode", False)):
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="System is currently in maintenance mode. Please try again later.",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
     return user
 
 
@@ -118,6 +133,22 @@ async def login(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user",
         )
+
+    # Check maintenance mode (admin is ALWAYS allowed to login)
+    user_role_name = (user.role.role_name if user.role else "").upper()
+    if user_role_name != "ADMIN":
+        try:
+            from app.services.settings_service import settings_service
+            system_settings = await settings_service.get_category_settings(db, "system")
+            if bool(system_settings.get("maintenance_mode", False)):
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="System is currently under maintenance. Only administrators can log in at this time.",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
 
     login_record = await login_history_service.create_login_record(db, {
         "user_id": user.id,
