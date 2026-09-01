@@ -6,6 +6,7 @@ from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.models.communication_model import Announcement, Message, Notification
 from app.models.user import User
+from app.models.role import Role
 from app.schemas.communication_schema import AnnouncementCreate, AnnouncementResponse, AnnouncementUpdate, MessageCreate, MessageResponse, NotificationCreate, NotificationResponse, NotificationUpdate
 from app.services.communication_service import announcement_service, message_service, notification_service
 
@@ -192,10 +193,131 @@ async def mark_all_notifications_read(
 ):
     return await notification_service.mark_all_as_read(session, current_user.id)
 
+@communication_router.get("/recipients")
+async def get_recipients(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    users_result = await session.execute(
+        select(User).join(Role, User.role_id == Role.id, isouter=True)
+    )
+    users = users_result.scalars().all()
+
+    recipients = []
+    for u in users:
+        role_name = (u.role.role_name if u.role else "User").capitalize()
+        display_name = f"{u.username} ({role_name})"
+        recipients.append({
+            "id": str(u.id),
+            "username": u.username,
+            "email": u.email,
+            "role": role_name,
+            "display_name": display_name,
+        })
+    return recipients
+
+
 message_router = APIRouter()
 @message_router.post("", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def send_message(payload: MessageCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return await message_service.send_message(session, payload.model_dump(exclude_none=True))
+    msg_text = (payload.message or payload.content or "").strip()
+    if not msg_text:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Message content cannot be empty")
+
+    sender_id = payload.sender_id or current_user.id
+
+    target_val = (payload.recipient_id or payload.recipient or "").strip()
+    
+    # Strip any role suffix like "(Student)", "(Teacher)", "(Librarian)"
+    clean_target = target_val.split("(")[0].strip() if "(" in target_val else target_val
+
+    target_users: list[User] = []
+
+    # 1. Try direct UUID
+    if payload.receiver_id:
+        u = await session.get(User, payload.receiver_id)
+        if u:
+            target_users.append(u)
+    elif clean_target:
+        try:
+            target_uuid = UUID(clean_target)
+            u = await session.get(User, target_uuid)
+            if u:
+                target_users.append(u)
+        except ValueError:
+            pass
+
+    # 2. Try match by username or email
+    if not target_users and clean_target:
+        u_res = await session.execute(
+            select(User).where(
+                or_(
+                    func.lower(User.username) == clean_target.lower(),
+                    func.lower(User.email) == clean_target.lower(),
+                )
+            )
+        )
+        target_users = list(u_res.scalars().all())
+
+    # 3. Try match by role name (e.g. "Student", "Parent", "Accountant", "Librarian", "Teacher", "Warden", "Staff", "All")
+    if not target_users and (clean_target or payload.recipient_type):
+        role_key = (clean_target or payload.recipient_type or "").upper()
+        aud_map = {
+            "ALL": None,
+            "STUDENT": ["STUDENT"],
+            "STUDENTS": ["STUDENT"],
+            "PARENT": ["PARENT"],
+            "PARENTS": ["PARENT"],
+            "TEACHER": ["TEACHER"],
+            "TEACHERS": ["TEACHER"],
+            "ACCOUNTANT": ["ACCOUNTANT"],
+            "ACCOUNTANTS": ["ACCOUNTANT"],
+            "LIBRARIAN": ["LIBRARIAN"],
+            "LIBRARIANS": ["LIBRARIAN"],
+            "WARDEN": ["WARDEN"],
+            "WARDENS": ["WARDEN"],
+            "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"],
+        }
+        
+        if role_key in aud_map:
+            target_roles = aud_map[role_key]
+            if target_roles is None:
+                # ALL users
+                all_u = await session.execute(select(User).where(User.id != sender_id))
+                target_users = list(all_u.scalars().all())
+            else:
+                role_u = await session.execute(
+                    select(User).join(Role, User.role_id == Role.id).where(
+                        func.upper(Role.role_name).in_(target_roles),
+                        User.id != sender_id
+                    )
+                )
+                target_users = list(role_u.scalars().all())
+
+    # 4. Fallback if still empty: send to first other user
+    if not target_users:
+        fallback_u = await session.scalar(select(User).where(User.id != sender_id))
+        if fallback_u:
+            target_users.append(fallback_u)
+        else:
+            fallback_self = await session.get(User, sender_id)
+            if fallback_self:
+                target_users.append(fallback_self)
+
+    first_msg = None
+    for target in target_users:
+        data = {
+            "sender_id": sender_id,
+            "receiver_id": target.id,
+            "message": msg_text,
+            "sent_on": payload.sent_on,
+        }
+        msg = await message_service.send_message(session, data)
+        if first_msg is None:
+            first_msg = msg
+
+    return first_msg
 @message_router.get("", response_model=list[MessageResponse])
 async def get_messages(
     scope: str = Query("me", description="Scope of messages: 'me' for personal inbox, 'all' for admin system view"),

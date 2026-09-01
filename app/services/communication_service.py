@@ -48,8 +48,9 @@ class MessageService(CRUDService):
         if "message" in data and not data["message"].strip(): raise HTTPException(status_code=400, detail="Message text cannot be empty")
         return await super().update(session, item_id, data)
     async def _validate(self, session, data):
-        if not data["message"].strip(): raise HTTPException(status_code=400, detail="Message text cannot be empty")
-        if data["sender_id"] == data["receiver_id"]: raise HTTPException(status_code=400, detail="Sender cannot message themselves")
+        if not (data.get("message") or "").strip(): raise HTTPException(status_code=400, detail="Message text cannot be empty")
+        if not data.get("sender_id") or not data.get("receiver_id"):
+            raise HTTPException(status_code=400, detail="Sender and receiver must be specified")
         if await session.get(User, data["sender_id"]) is None or await session.get(User, data["receiver_id"]) is None: raise HTTPException(status_code=400, detail="Sender and receiver must be valid users")
     async def send_message(self, session, data): return await self.create(session, data)
     async def mark_as_read(self, session, item_id): return await self.update(session, item_id, {"is_read": True})

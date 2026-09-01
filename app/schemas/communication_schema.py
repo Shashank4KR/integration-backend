@@ -51,9 +51,14 @@ class NotificationResponse(BaseModel):
 
 
 class MessageCreate(BaseModel):
-    sender_id: UUID
-    receiver_id: UUID
-    message: str = Field(min_length=1)
+    sender_id: UUID | None = None
+    receiver_id: UUID | None = None
+    recipient_id: str | None = None
+    recipient: str | None = None
+    message: str | None = None
+    content: str | None = None
+    subject: str | None = None
+    message_type: str | None = None
     sent_on: datetime | None = None
 
 
