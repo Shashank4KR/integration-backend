@@ -30,7 +30,8 @@ router = APIRouter()
 
 
 def _ensure_teacher_or_admin(current_user: User) -> None:
-    if current_user.role.role_name not in ("ADMIN", "TEACHER"):
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "TEACHER"):
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
