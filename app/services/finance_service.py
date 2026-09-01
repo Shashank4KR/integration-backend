@@ -570,16 +570,30 @@ class FinanceService:
         total = await payment_repository.total_paid(session, start_date=start, end_date=end)
         payments = await payment_repository.get_by_date_range(session, start, end)
         by_method: dict[str, float] = {}
+        
+        MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        monthly_totals = {m: Decimal("0.00") for m in MONTH_NAMES}
+
         for p in payments:
-            by_method[p.payment_method] = by_method.get(p.payment_method, 0.0) + float(
-                p.amount_paid
-            )
+            method_key = p.payment_method or "Other"
+            by_method[method_key] = by_method.get(method_key, 0.0) + float(p.amount_paid)
+            
+            p_date = p.payment_date or (p.created_at.date() if p.created_at else None)
+            if p_date:
+                m_name = MONTH_NAMES[p_date.month - 1]
+                monthly_totals[m_name] += p.amount_paid
+
+        monthly_breakdown = [
+            {"month": m, "total": float(amt)}
+            for m, amt in monthly_totals.items()
+        ]
 
         return {
             "year": year,
             "total_collection": total,
             "total_transactions": len(payments),
             "by_method": by_method,
+            "monthly_breakdown": monthly_breakdown,
         }
 
     async def get_report_outstanding_fees(
