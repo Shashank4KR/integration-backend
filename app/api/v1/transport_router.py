@@ -353,6 +353,28 @@ async def get_student_transport_allocations(session: AsyncSession = Depends(get_
     return success_response(data)
 
 
+@transport_router.post("/student-transport", status_code=status.HTTP_201_CREATED)
+async def create_student_transport_allocation(
+    payload: StudentTransportCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    allocation = await student_transport_service.create_transport(session, payload.model_dump())
+    return success_response(allocation, message="Student assigned to transport successfully")
+
+
+@transport_router.delete("/student-transport/{item_id}")
+async def delete_student_transport_allocation(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    await student_transport_service.delete_transport(session, item_id)
+    return success_response(message="Student transport allocation removed successfully")
+
+
 @transport_router.get("/trips")
 async def get_trips(session: AsyncSession = Depends(get_db)):
     from sqlalchemy.orm import selectinload
