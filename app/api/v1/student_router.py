@@ -31,6 +31,26 @@ router = build_crud_router(
     read_roles=("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"),
 )
 
+
+@router.get("", response_model=list[StudentResponse])
+async def list_students(
+    class_id: UUID | None = None,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_roles(current_user, ("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"))
+    if class_id is not None:
+        result = await session.execute(select(Student).where(Student.class_id == class_id))
+        students = list(result.scalars().all())
+    else:
+        students = list(await student_service.list(session))
+
+    for st in students:
+        if not st.class_name and st.class_:
+            st.class_name = f"{st.class_.class_name}{f' - {st.class_.section}' if st.class_.section else ''}"
+    return students
+
+
 async def get_current_student(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),

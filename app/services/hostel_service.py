@@ -38,7 +38,20 @@ class HostelBlockService(CRUDService):
 class HostelRoomService(CRUDService):
     async def create_room(self, session, data):
         self._validate(data)
-        return await self.create(session, data)
+        room = await self.create(session, data)
+        capacity = int(data.get("capacity", 1))
+        room_no = data.get("room_no", "Room")
+        for i in range(1, capacity + 1):
+            bed_no = f"{room_no}-{i}"
+            bed = HostelBed(
+                room_id=room.id,
+                bed_no=bed_no,
+                status=HostelBedStatus.VACANT,
+            )
+            session.add(bed)
+        await session.commit()
+        await session.refresh(room)
+        return room
     async def update_room(self, session, item_id, data):
         room = await self.get(session, item_id)
         self._validate(data)
@@ -56,6 +69,24 @@ class HostelRoomService(CRUDService):
 
 
 class HostelBedService(CRUDService):
+    async def ensure_room_beds(self, session: AsyncSession):
+        rooms = list((await session.execute(select(HostelRoom))).scalars().all())
+        created_any = False
+        for r in rooms:
+            existing_beds = list((await session.execute(select(HostelBed).where(HostelBed.room_id == r.id))).scalars().all())
+            existing_nos = {b.bed_no for b in existing_beds}
+            for i in range(1, r.capacity + 1):
+                bed_no = f"{r.room_no}-{i}"
+                if bed_no not in existing_nos:
+                    session.add(HostelBed(
+                        room_id=r.id,
+                        bed_no=bed_no,
+                        status=HostelBedStatus.VACANT,
+                    ))
+                    created_any = True
+        if created_any:
+            await session.commit()
+
     async def create_bed(self, session, data):
         if not data["bed_no"].strip(): _bad_request("Bed number cannot be empty")
         if data.get("status") == HostelBedStatus.OCCUPIED: _bad_request("Beds can only be occupied through allocation")
@@ -71,8 +102,12 @@ class HostelBedService(CRUDService):
             _bad_request("Cannot delete a bed with allocation history")
         await self.delete(session, item_id)
     async def get_bed(self, session, item_id): return await self.get(session, item_id)
-    async def get_beds(self, session): return await self.list(session)
-    async def get_available_beds(self, session): return await self.repository.get_available_beds(session)
+    async def get_beds(self, session):
+        await self.ensure_room_beds(session)
+        return await self.list(session)
+    async def get_available_beds(self, session):
+        await self.ensure_room_beds(session)
+        return await self.repository.get_available_beds(session)
 
 
 class HostelAllocationService(CRUDService):

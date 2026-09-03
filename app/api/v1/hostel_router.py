@@ -159,6 +159,7 @@ async def hostel_dashboard(session: AsyncSession = Depends(get_db)):
 
 @hostel_router.get("/dashboard/stats")
 async def hostel_dashboard_stats(session: AsyncSession = Depends(get_db)):
+    await hostel_bed_service.ensure_room_beds(session)
     total_blocks = await session.scalar(select(func.count(HostelBlock.id))) or 0
     total_rooms = await session.scalar(select(func.count(HostelRoom.id))) or 0
     total_beds = await session.scalar(select(func.count(HostelBed.id))) or 0
