@@ -26,6 +26,16 @@ def _ensure_admin(current_user: User) -> None:
         )
 
 
+def _ensure_admin_or_teacher(current_user: User) -> None:
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role not in ("ADMIN", "SUPER_ADMIN", "TEACHER", "FACULTY"):
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators and teachers can perform this action",
+        )
+
+
 def _audiences_for_role(current_user: User) -> tuple[str, ...]:
     role_name = current_user.role.role_name.upper() if current_user.role else ""
     role_audience = {
@@ -81,14 +91,32 @@ async def get_communication_statistics(
 
 @announcement_router.post("", response_model=AnnouncementResponse, status_code=status.HTTP_201_CREATED)
 async def create_announcement(payload: AnnouncementCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin(current_user)
-    return await announcement_service.create_announcement(session, payload.model_dump())
+    _ensure_admin_or_teacher(current_user)
+    data = payload.model_dump(exclude_unset=True)
+    msg = data.get("message") or data.get("content") or ""
+    if not msg.strip():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Announcement message cannot be empty")
+
+    aud = (data.get("target_audience") or data.get("audience") or "ALL").upper()
+    creator_id = data.get("created_by") or current_user.id
+
+    announcement_dict = {
+        "title": data["title"],
+        "message": msg.strip(),
+        "target_audience": aud,
+        "created_by": creator_id,
+    }
+    return await announcement_service.create_announcement(session, announcement_dict)
+
+
 @announcement_router.get("", response_model=list[AnnouncementResponse])
 async def get_announcements(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name == "ADMIN":
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role in ("ADMIN", "SUPER_ADMIN", "TEACHER", "FACULTY"):
         return await announcement_service.get_announcements(session)
     result = await session.execute(
         select(Announcement).where(Announcement.target_audience.in_(_audiences_for_role(current_user)))
@@ -327,9 +355,11 @@ async def get_messages(
     if scope == "all" and current_user.role and current_user.role.role_name == "ADMIN":
         return await message_service.list(session)
     result = await session.execute(
-        select(Message).where(
+        select(Message)
+        .where(
             or_(Message.sender_id == current_user.id, Message.receiver_id == current_user.id)
         )
+        .order_by(Message.sent_on.desc(), Message.created_at.desc())
     )
     return result.scalars().all()
 @message_router.get("/conversation", response_model=list[MessageResponse])
