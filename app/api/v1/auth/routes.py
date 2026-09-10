@@ -228,6 +228,9 @@ async def update_profile(
     if new_phone is not None:
         current_user.phone = new_phone
 
+    if "avatar_url" in payload:
+        current_user.avatar_url = payload.get("avatar_url")
+
     db.add(current_user)
     await audit_log_service.create_log(
         db,
