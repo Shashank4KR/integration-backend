@@ -46,6 +46,7 @@ from app.repositories.finance_repository import (
     student_scholarship_repository,
 )
 from app.services.crud_service import CRUDService
+from app.services.fee_service import fee_invoice_service
 
 
 def _bad_request(detail: str) -> None:

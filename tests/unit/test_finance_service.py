@@ -181,7 +181,7 @@ def test_finance_schemas_exist():
 
 
 def test_finance_router_has_expected_routes():
-    from app.api.v1.finance_router import finance_router
+    from app.api.v1.finance import finance_router
 
     route_paths = [route.path for route in finance_router.routes if hasattr(route, "path")]
     expected_routes = [
@@ -258,3 +258,61 @@ def test_finance_models_importable():
     assert RefundRequest is not None
     assert OtherIncome is not None
     assert ExpenseCategory is not None
+
+
+@pytest.mark.asyncio
+async def test_generate_invoice():
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+    from datetime import date
+    from decimal import Decimal
+    from app.services.finance_service import finance_service
+    from app.services.fee_service import fee_invoice_service
+
+    invoice_id = uuid4()
+    mock_invoice = MagicMock()
+    mock_invoice.id = invoice_id
+    mock_invoice.student_id = uuid4()
+    mock_invoice.fee_type_id = uuid4()
+    mock_invoice.invoice_number = "INV-12345"
+    mock_invoice.invoice_date = date.today()
+    mock_invoice.due_date = date.today()
+    mock_invoice.status = "PENDING"
+    mock_invoice.amount = Decimal("1000.00")
+    mock_invoice.net_amount = Decimal("900.00")
+    mock_invoice.discount_amount = Decimal("100.00")
+    mock_invoice.late_fee_amount = Decimal("0.00")
+    mock_invoice.scholarship_amount = Decimal("0.00")
+
+    mock_student = MagicMock()
+    mock_student.id = mock_invoice.student_id
+    mock_student.first_name = "John"
+    mock_student.last_name = "Doe"
+    mock_student.class_name = "Grade 10"
+    mock_student.admission_no = "ADM123"
+
+    mock_fee_struct = MagicMock()
+    mock_fee_struct.fee_type = "Tuition"
+    mock_fee_struct.tax_percentage = Decimal("5.00")
+
+    mock_session = AsyncMock()
+    mock_session.get.side_effect = [mock_student, mock_fee_struct]
+
+    fee_invoice_service_get_original = fee_invoice_service.get
+    fee_invoice_service.get = AsyncMock(return_value=mock_invoice)
+
+    import app.services.finance_service
+    original_invoice_total_paid = app.services.finance_service._invoice_total_paid
+    app.services.finance_service._invoice_total_paid = AsyncMock(return_value=Decimal("200.00"))
+
+    try:
+        result = await finance_service.generate_invoice(mock_session, invoice_id)
+        assert result["invoice_number"] == "INV-12345"
+        assert result["student_details"]["name"] == "John Doe"
+        assert result["fee_breakdown"][0]["fee_type"] == "Tuition"
+        assert result["total_amount"] == 900.0
+        assert result["paid_amount"] == 200.0
+        assert result["balance_remaining"] == 700.0
+    finally:
+        fee_invoice_service.get = fee_invoice_service_get_original
+        app.services.finance_service._invoice_total_paid = original_invoice_total_paid

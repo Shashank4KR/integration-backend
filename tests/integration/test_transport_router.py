@@ -1,5 +1,5 @@
 import pytest
-from app.api.v1.transport_router import transport_router
+from app.api.v1.transport import transport_router
 
 
 def test_transport_router_has_required_routes():

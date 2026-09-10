@@ -99,3 +99,57 @@ class StudentPerformanceSummary(BaseModel):
     average_percentage: float
     best_subject: Optional[str] = None
     worst_subject: Optional[str] = None
+
+
+class ExamSubjectCreate(BaseModel):
+    subject_id: UUID
+
+
+class ExamSubjectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    exam_id: UUID
+    subject_id: UUID
+    created_at: datetime
+
+
+class ExamInvigilatorCreate(BaseModel):
+    teacher_id: UUID
+    room_no: Optional[str] = None
+    invigilator_date: Optional[date] = None
+
+
+class ExamInvigilatorResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    exam_id: UUID
+    teacher_id: UUID
+    room_no: Optional[str] = None
+    invigilator_date: Optional[date] = None
+    created_at: datetime
+
+
+from datetime import time
+
+
+class ExamTimetableCreate(BaseModel):
+    subject_id: UUID
+    exam_date: date
+    start_time: time
+    end_time: time
+    room_no: Optional[str] = None
+
+
+class ExamTimetableResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    exam_id: UUID
+    subject_id: UUID
+    exam_date: date
+    start_time: time
+    end_time: time
+    room_no: Optional[str] = None
+    created_at: datetime

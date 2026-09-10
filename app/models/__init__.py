@@ -82,6 +82,7 @@ from .academic_content_model import (
     StudentFeedback,
 )
 from .settings_model import SystemSetting
+from .exam_models import ExamSubject, ExamInvigilator, ExamTimetable
 
 Faculty = Teacher
 StudentParent = ParentStudent

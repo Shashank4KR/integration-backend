@@ -161,14 +161,29 @@ async def create_bulk_attendance(
 
 @router.get("", response_model=list[AttendanceResponse])
 async def get_all_attendance(
+    class_id: UUID | None = Query(None),
+    student_id: UUID | None = Query(None),
+    teacher_id: UUID | None = Query(None),
+    subject_id: UUID | None = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    status: str | None = Query(None),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_teacher_or_admin(current_user)
     teacher = await _get_current_teacher(session, current_user)
-    if teacher is not None:
-        return await attendance_service.get_teacher_attendance(session, teacher.id)
-    return await attendance_service.get_all_attendance(session)
+    effective_teacher_id = teacher.id if teacher is not None else teacher_id
+    return await attendance_service.get_all_attendance(
+        session,
+        class_id=class_id,
+        student_id=student_id,
+        teacher_id=effective_teacher_id,
+        subject_id=subject_id,
+        start_date=start_date,
+        end_date=end_date,
+        status=status,
+    )
 
 
 @router.get("/student/{student_id}", response_model=list[AttendanceResponse])

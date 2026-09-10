@@ -48,8 +48,27 @@ class AttendanceService:
             )
         return attendance
 
-    async def get_all_attendance(self, session: AsyncSession):
-        return await attendance_repository.get_all(session)
+    async def get_all_attendance(
+        self,
+        session: AsyncSession,
+        class_id: UUID | None = None,
+        student_id: UUID | None = None,
+        teacher_id: UUID | None = None,
+        subject_id: UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        status: str | None = None,
+    ):
+        return await attendance_repository.get_all(
+            session,
+            class_id=class_id,
+            student_id=student_id,
+            teacher_id=teacher_id,
+            subject_id=subject_id,
+            start_date=start_date,
+            end_date=end_date,
+            status=status,
+        )
 
     async def get_student_attendance(self, session: AsyncSession, student_id: UUID):
         await self._require_exists(session, Student, student_id, "Student")

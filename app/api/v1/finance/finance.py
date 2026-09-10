@@ -100,6 +100,8 @@ from app.schemas.finance_schema import (
     StudentDashboardResponse,
     StudentScholarshipCreate,
     SalaryCreate,
+    SalaryResponse,
+    SalaryUpdate,
     StudentScholarshipResponse,
     StudentScholarshipUpdate,
 )
@@ -129,8 +131,15 @@ from app.repositories.finance_repository import (
 )
 
 
+def _get_user_role(current_user: User) -> str:
+    role_obj = getattr(current_user, "role", None)
+    role_name = getattr(role_obj, "role_name", None) or getattr(current_user, "role_name", None) or ""
+    return str(role_name).upper()
+
+
 def _ensure_admin_or_accountant(current_user: User) -> None:
-    if current_user.role.role_name not in ("ADMIN", "ACCOUNTANT"):
+    role_name = _get_user_role(current_user)
+    if role_name not in ("ADMIN", "ACCOUNTANT"):
         raise APIException(
             status_code=status.HTTP_403_FORBIDDEN,
             message="Only admin or accountant users can perform this action",
@@ -138,7 +147,8 @@ def _ensure_admin_or_accountant(current_user: User) -> None:
 
 
 def _ensure_admin(current_user: User) -> None:
-    if current_user.role.role_name != "ADMIN":
+    role_name = _get_user_role(current_user)
+    if role_name != "ADMIN":
         raise APIException(
             status_code=status.HTTP_403_FORBIDDEN,
             message="Only admin users can perform this action",
@@ -242,6 +252,7 @@ async def list_salary_records(
 
 
 @finance_router.post("/salary", status_code=status.HTTP_201_CREATED)
+@finance_router.post("/salary/process", status_code=status.HTTP_201_CREATED)
 async def process_salary(
     payload: SalaryCreate,
     session: AsyncSession = Depends(get_db),
@@ -250,6 +261,54 @@ async def process_salary(
     _ensure_admin(current_user)
     item = await finance_service.create_salary(session, payload.model_dump())
     return success_response(item, message="Salary processed successfully")
+
+
+@finance_router.post("/salary/bulk-process", status_code=status.HTTP_201_CREATED)
+async def bulk_process_salary(
+    payload: list[SalaryCreate],
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    results = []
+    for item_data in payload:
+        item = await finance_service.create_salary(session, item_data.model_dump())
+        results.append(item)
+    return success_response(results, message=f"{len(results)} salaries processed successfully")
+
+
+@finance_router.get("/salary/{item_id}")
+async def get_salary_record(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await salary_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/salary/{item_id}")
+async def update_salary_record(
+    item_id: UUID,
+    payload: SalaryUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await salary_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Salary record updated successfully")
+
+
+@finance_router.delete("/salary/{item_id}")
+async def delete_salary_record(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    await salary_service.delete(session, item_id)
+    return success_response(message="Salary record deleted successfully")
 
 
 # Fee structures
@@ -924,13 +983,13 @@ async def apply_late_fees(
 # Refunds
 @finance_router.get("/refunds")
 async def list_refunds(
-    status: str | None = Query(None),
+    status_param: str | None = Query(None, alias="status"),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin_or_accountant(current_user)
-    if status is not None:
-        items = await refund_request_repository.get_by_status(session, status)
+    if status_param is not None:
+        items = await refund_request_repository.get_by_status(session, status_param)
     else:
         items = await refund_service.list(session)
     return success_response(items)
@@ -1118,12 +1177,12 @@ async def delete_expense_category(
 # Reports
 @finance_router.get("/reports/daily-collection")
 async def report_daily_collection(
-    date: date | None = Query(None),
+    target_date: date | None = Query(None, alias="date"),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin_or_accountant(current_user)
-    data = await finance_service.get_report_daily_collection(session, date)
+    data = await finance_service.get_report_daily_collection(session, target_date)
     return success_response(data)
 
 
@@ -1319,16 +1378,17 @@ async def get_student_finance_dashboard(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name not in ("ADMIN", "STUDENT"):
+    role_name = _get_user_role(current_user)
+    if role_name not in ("ADMIN", "STUDENT"):
         raise APIException(
             status_code=status.HTTP_403_FORBIDDEN,
             message="Only admin or student users can access this dashboard",
         )
-    if current_user.role.role_name == "STUDENT":
-        student = await session.execute(
+    if role_name == "STUDENT":
+        student_res = await session.execute(
             select(Student).where(Student.user_id == current_user.id)
         )
-        student_obj = student.scalar_one_or_none()
+        student_obj = student_res.scalar_one_or_none()
         if student_obj is None or student_obj.id != student_id:
             raise APIException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1344,12 +1404,13 @@ async def get_parent_finance_dashboard(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name not in ("ADMIN", "PARENT"):
+    role_name = _get_user_role(current_user)
+    if role_name not in ("ADMIN", "PARENT"):
         raise APIException(
             status_code=status.HTTP_403_FORBIDDEN,
             message="Only admin or parent users can access this dashboard",
         )
-    if current_user.role.role_name == "PARENT":
+    if role_name == "PARENT":
         if current_user.id != parent_id:
             raise APIException(
                 status_code=status.HTTP_403_FORBIDDEN,
