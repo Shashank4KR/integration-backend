@@ -1,34 +1,49 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
-from app.models.hostel_model import HostelAllocation, HostelAllocationStatus, HostelBed, HostelBedStatus, HostelBlock, HostelRoom, HostelRoomStatus
+from app.models.hostel_model import HostelAllocation, HostelAllocationStatus, HostelBed, HostelBedStatus, HostelBlock, HostelRoom
+from app.models.student_model import Student
 from app.models.user import User
-from app.schemas.hostel_schema import HostelAllocationCreate, HostelAllocationResponse, HostelBedCreate, HostelBedResponse, HostelBedUpdate, HostelBlockCreate, HostelBlockResponse, HostelBlockUpdate, HostelRoomCreate, HostelRoomResponse, HostelRoomUpdate, HostelTransferRequest
+from app.schemas.hostel_schema import (
+    HostelAllocationCreate,
+    HostelAllocationResponse,
+    HostelBedCreate,
+    HostelBedResponse,
+    HostelBedUpdate,
+    HostelBlockCreate,
+    HostelBlockResponse,
+    HostelBlockUpdate,
+    HostelCheckoutRequest,
+    HostelRoomCreate,
+    HostelRoomResponse,
+    HostelRoomUpdate,
+    HostelTransferRequest,
+)
 from app.services.audit_service import audit_log_service
 from app.services.communication_service import notification_service
 from app.services.hostel_service import hostel_allocation_service, hostel_bed_service, hostel_block_service, hostel_room_service
 
 async def _audit(session, user_id, activity, details):
     try:
-        await audit_log_service.create_log(session, {"user_id": user_id, "activity": activity, "details": details}, commit=False)
+        await audit_log_service.create_log(session, {"user_id": user_id, "activity": activity, "details": details})
     except Exception:
         pass
 
 async def _notify(session, user_id, title, message):
     try:
-        await notification_service.create(session, {"user_id": user_id, "title": title, "message": message}, commit=False)
+        await notification_service.create(session, {"user_id": user_id, "title": title, "message": message})
     except Exception:
         pass
 
 def _ensure_admin_or_warden(current_user: User) -> None:
-    if current_user.role.role_name not in ("ADMIN", "WARDEN"):
-        from fastapi import HTTPException
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "WARDEN"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin or warden users can perform this action",
@@ -122,11 +137,12 @@ async def allocate_student(payload: HostelAllocationCreate, session: AsyncSessio
     _ensure_admin_or_warden(current_user)
     result = await hostel_allocation_service.allocate(session, payload.model_dump())
     await _audit(session, current_user.id, "Allocate Student to Hostel", f"Allocated student {payload.student_id} to bed {payload.bed_id}")
-    await _notify(session, payload.student_id, "Hostel Allocation", f"You have been allocated to a hostel bed.")
+    student = await session.get(Student, payload.student_id)
+    if student and student.user_id:
+        await _notify(session, student.user_id, "Hostel Allocation", "You have been allocated to a hostel bed.")
     return result
 @allocation_router.post("", response_model=HostelAllocationResponse, status_code=status.HTTP_201_CREATED)
 async def create_allocation(payload: HostelAllocationCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
     return await allocate_student(payload, session, current_user)
 @allocation_router.get("", response_model=list[HostelAllocationResponse])
 async def get_allocations(session: AsyncSession = Depends(get_db)):
@@ -135,9 +151,9 @@ async def get_allocations(session: AsyncSession = Depends(get_db)):
 async def get_allocation(item_id: UUID, session: AsyncSession = Depends(get_db)):
     return await hostel_allocation_service.get_allocation(session, item_id)
 @allocation_router.post("/{allocation_id}/checkout", response_model=HostelAllocationResponse)
-async def checkout_student(allocation_id: UUID, checkout_date: date, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def checkout_student(allocation_id: UUID, payload: HostelCheckoutRequest, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin_or_warden(current_user)
-    result = await hostel_allocation_service.checkout(session, allocation_id, checkout_date)
+    result = await hostel_allocation_service.checkout(session, allocation_id, payload.checkout_date)
     await _audit(session, current_user.id, "Checkout Student", f"Checked out student from allocation {allocation_id}")
     return result
 @allocation_router.post("/{allocation_id}/transfer", response_model=HostelAllocationResponse)

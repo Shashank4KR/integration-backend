@@ -1360,27 +1360,6 @@ async def get_parent_finance_dashboard(
 
 
 # Payments
-@finance_router.get("/payments")
-async def list_payments(
-    session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    _ensure_admin_or_accountant(current_user)
-    items = await payment_service.list(session)
-    return success_response(items)
-
-
-@finance_router.post("/payments", status_code=status.HTTP_201_CREATED)
-async def create_payment(
-    payload: PaymentCreate,
-    session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    _ensure_admin_or_accountant(current_user)
-    item = await payment_service.create(session, payload.model_dump())
-    return success_response(item, message="Payment recorded successfully")
-
-
 @finance_router.get("/payments/{item_id}")
 async def get_payment(
     item_id: UUID,

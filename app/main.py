@@ -233,6 +233,7 @@ app.include_router(hostel_extra_router, prefix="/hostel", tags=["Hostel"])
 app.include_router(hostel_complaint_router, prefix="/hostel-complaints", tags=["Hostel Complaints"])
 app.include_router(hostel_notice_router, prefix="/hostel-notices", tags=["Hostel Notices"])
 app.include_router(hostel_setting_router, prefix="/hostel-settings", tags=["Hostel Settings"])
+app.include_router(hostel_leave_router, prefix="/hostel-leave-requests", tags=["Hostel Leave Requests"])
 app.include_router(settings_router, prefix="/settings", tags=["Settings"])
 from app.api.v1.academic_content_router import router as academic_content_router
 
