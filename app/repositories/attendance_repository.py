@@ -22,8 +22,33 @@ class AttendanceRepository:
     ) -> Attendance | None:
         return await session.get(Attendance, attendance_id)
 
-    async def get_all(self, session: AsyncSession) -> list[Attendance]:
-        result = await session.execute(select(Attendance))
+    async def get_all(
+        self,
+        session: AsyncSession,
+        class_id: UUID | None = None,
+        student_id: UUID | None = None,
+        teacher_id: UUID | None = None,
+        subject_id: UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        status: str | None = None,
+    ) -> list[Attendance]:
+        stmt = select(Attendance)
+        if class_id:
+            stmt = stmt.where(Attendance.class_id == class_id)
+        if student_id:
+            stmt = stmt.where(Attendance.student_id == student_id)
+        if teacher_id:
+            stmt = stmt.where(Attendance.teacher_id == teacher_id)
+        if subject_id:
+            stmt = stmt.where(Attendance.subject_id == subject_id)
+        if start_date:
+            stmt = stmt.where(Attendance.attendance_date >= start_date)
+        if end_date:
+            stmt = stmt.where(Attendance.attendance_date <= end_date)
+        if status:
+            stmt = stmt.where(Attendance.status == status)
+        result = await session.execute(stmt)
         return list(result.scalars().all())
 
     async def update(
