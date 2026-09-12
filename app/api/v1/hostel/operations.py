@@ -22,7 +22,7 @@ from app.schemas.hostel_operations_schema import (
     MessAttendanceCreate, MessAttendanceResponse,
     MessCollectionCreate, MessCollectionResponse,
     MessExpenseCreate, MessExpenseResponse,
-    MessMenuCreate, MessMenuResponse,
+    MessMenuCreate, MessMenuResponse, MessMenuUpdate,
     WorkOrderCreate, WorkOrderResponse,
     HostelComplaintCreate, HostelComplaintResponse, HostelComplaintUpdate,
     HostelNoticeCreate, HostelNoticeResponse, HostelNoticeUpdate,
@@ -62,7 +62,11 @@ def crud(prefix, create, response, service, role_check=None):
     async def create_item(p: create, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
         if role_check:
             role_check(current_user)
-        return await service.create(s, p.model_dump())
+        data = p.model_dump()
+        for field in ("created_by", "received_by", "approved_by", "published_by", "requested_by"):
+            if field in data and data[field] is None:
+                data[field] = current_user.id
+        return await service.create(s, data)
     @r.get('', response_model=list[response])
     async def list_items(s: AsyncSession = Depends(get_db)):
         return await service.list(s)
@@ -86,7 +90,75 @@ async def visitor_del(item_id: UUID, s: AsyncSession = Depends(get_db), current_
 fee_structure_router = crud('', HostelFeeStructureCreate, HostelFeeStructureResponse, hostel_fee_structure_service, _ensure_admin_or_accountant)
 fee_invoice_router = crud('', HostelFeeInvoiceCreate, HostelFeeInvoiceResponse, hostel_fee_invoice_service, _ensure_admin_or_accountant)
 hostel_payment_router = crud('', HostelPaymentCreate, HostelPaymentResponse, hostel_payment_service, _ensure_admin_or_accountant)
-mess_menu_router = crud('', MessMenuCreate, MessMenuResponse, mess_menu_service, _ensure_admin_or_warden)
+
+mess_menu_router = APIRouter()
+
+@mess_menu_router.get('', response_model=list[MessMenuResponse])
+async def list_mess_menus(s: AsyncSession = Depends(get_db)):
+    return await mess_menu_service.list(s)
+
+@mess_menu_router.post('', response_model=MessMenuResponse, status_code=status.HTTP_201_CREATED)
+async def create_mess_menu(
+    p: MessMenuCreate,
+    s: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_warden(current_user)
+    data = p.model_dump()
+    if not data.get("created_by"):
+        data["created_by"] = current_user.id
+
+    items_val = data.pop("items", None)
+    if items_val:
+        m = (data.get("meal_type") or "").lower()
+        if "breakfast" in m and not data.get("breakfast"):
+            data["breakfast"] = items_val
+        elif "lunch" in m and not data.get("lunch"):
+            data["lunch"] = items_val
+        elif "dinner" in m and not data.get("dinner"):
+            data["dinner"] = items_val
+        else:
+            if not data.get("breakfast"):
+                data["breakfast"] = items_val
+
+    return await mess_menu_service.create(s, data)
+
+@mess_menu_router.get('/{item_id}', response_model=MessMenuResponse)
+async def get_mess_menu(item_id: UUID, s: AsyncSession = Depends(get_db)):
+    return await mess_menu_service.get(s, item_id)
+
+@mess_menu_router.put('/{item_id}', response_model=MessMenuResponse)
+async def update_mess_menu(
+    item_id: UUID,
+    p: MessMenuUpdate,
+    s: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_warden(current_user)
+    data = p.model_dump(exclude_unset=True)
+    items_val = data.pop("items", None)
+    if items_val:
+        m = (data.get("meal_type") or "").lower()
+        if "breakfast" in m and not data.get("breakfast"):
+            data["breakfast"] = items_val
+        elif "lunch" in m and not data.get("lunch"):
+            data["lunch"] = items_val
+        elif "dinner" in m and not data.get("dinner"):
+            data["dinner"] = items_val
+        else:
+            if not data.get("breakfast"):
+                data["breakfast"] = items_val
+    return await mess_menu_service.update(s, item_id, data)
+
+@mess_menu_router.delete('/{item_id}')
+async def delete_mess_menu(
+    item_id: UUID,
+    s: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_warden(current_user)
+    await mess_menu_service.delete(s, item_id)
+    return {'message': 'Deleted successfully'}
 mess_expense_router = crud('', MessExpenseCreate, MessExpenseResponse, mess_expense_service, _ensure_admin_or_accountant)
 mess_collection_router = crud('', MessCollectionCreate, MessCollectionResponse, mess_collection_service, _ensure_admin_or_accountant)
 mess_attendance_router = crud('', MessAttendanceCreate, MessAttendanceResponse, mess_attendance_service, _ensure_admin_or_warden)

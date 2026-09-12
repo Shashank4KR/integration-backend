@@ -229,7 +229,15 @@ async def update_profile(
         current_user.phone = new_phone
 
     if "avatar_url" in payload:
-        current_user.avatar_url = payload.get("avatar_url")
+        new_avatar = payload.get("avatar_url")
+        if new_avatar is not None:
+            if not isinstance(new_avatar, str):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid avatar format")
+            if len(new_avatar) > 4_000_000:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar image is too large (max 3MB)")
+            if not (new_avatar.startswith(("data:image/", "http://", "https://", "/"))):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar must be a valid image URL or data URI")
+        current_user.avatar_url = new_avatar
 
     db.add(current_user)
     await audit_log_service.create_log(
