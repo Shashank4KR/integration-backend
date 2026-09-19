@@ -1,12 +1,18 @@
 from collections import Counter
 from datetime import date
+import re
+import uuid
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import hash_password
 from app.models.admission_model import AdmissionApplicationStatus
 from app.models.class_model import Class
+from app.models.role import Role
+from app.models.student_model import Student
 from app.models.user import User
 from app.repositories.admission_repository import (
     admission_application_repository,
@@ -93,19 +99,68 @@ class AdmissionApplicationService:
         )
         await session.flush()
 
-        try:
-            fee_structures = await fee_structure_service.list(session)
-            for fee_structure in fee_structures:
-                await fee_invoice_service.assign_fee_to_student(
-                    session,
-                    item.student_id,
-                    {
-                        "fee_structure_id": fee_structure.id,
-                        "academic_year": date.today().year,
-                    },
-                )
-        except Exception:
-            pass
+        # Create student user and profile
+        names = item.applicant_name.strip().split(" ", 1)
+        first_name = names[0]
+        last_name = names[1] if len(names) > 1 else ""
+
+        # Fetch STUDENT role
+        role_result = await session.execute(
+            select(Role).where(Role.role_name == "STUDENT")
+        )
+        student_role = role_result.scalar_one_or_none()
+        if student_role is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Default STUDENT role not found in system",
+            )
+
+        unique_suffix = str(uuid.uuid4())[:6]
+        safe_name = re.sub(r"[^a-zA-Z0-9]", "", first_name.lower()) or "student"
+        username = f"{safe_name}_{unique_suffix}"
+        email = f"{username}@school.internal"
+
+        user = User(
+            id=uuid.uuid4(),
+            username=username,
+            email=email,
+            password_hash=hash_password("Student@12345"),
+            role_id=student_role.id,
+            status=True,
+        )
+        session.add(user)
+        await session.flush()
+
+        # Fetch class details if available
+        target_class = await session.get(Class, item.applied_class)
+        class_name = None
+        if target_class:
+            class_name = f"{target_class.class_name}{f' - {target_class.section}' if target_class.section else ''}"
+
+        admission_no = f"ADM-{date.today().year}-{unique_suffix.upper()}"
+        student = Student(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            admission_no=admission_no,
+            first_name=first_name,
+            last_name=last_name,
+            class_id=item.applied_class,
+            class_name=class_name,
+            joining_date=date.today(),
+        )
+        session.add(student)
+        await session.flush()
+
+        fee_structures = await fee_structure_service.list(session)
+        for fee_structure in fee_structures:
+            await fee_invoice_service.assign_fee_to_student(
+                session,
+                student.id,
+                {
+                    "fee_structure_id": fee_structure.id,
+                    "academic_year": str(date.today().year),
+                },
+            )
 
         await session.commit()
         return item
