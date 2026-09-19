@@ -91,7 +91,16 @@ async def create_fee_invoice(payload: FeeInvoiceCreate, session: AsyncSession = 
     _ensure_admin_or_accountant(current_user)
     return await fee_invoice_service.create(session, payload.model_dump())
 @fee_invoice_router.get("", response_model=list[FeeInvoiceResponse])
-async def list_fee_invoices(session: AsyncSession = Depends(get_db)): return await fee_invoice_service.list(session)
+async def list_fee_invoices(
+    status: str | None = None,
+    student_id: UUID | None = None,
+    session: AsyncSession = Depends(get_db),
+):
+    if student_id and status:
+        return await fee_invoice_service.get_by_student_and_status(session, student_id, status)
+    elif student_id:
+        return await fee_invoice_service.get_by_student(session, student_id)
+    return await fee_invoice_service.list(session, status=status)
 @fee_invoice_router.get("/{item_id}", response_model=FeeInvoiceResponse)
 async def get_fee_invoice(item_id: UUID, session: AsyncSession = Depends(get_db)): return await fee_invoice_service.get(session, item_id)
 @fee_invoice_router.put("/{item_id}", response_model=FeeInvoiceResponse)

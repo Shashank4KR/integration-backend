@@ -94,10 +94,20 @@ class FeeInvoiceRepository(CRUDRepository[FeeInvoice]):
     async def get_by_student_and_status(
         self, session: AsyncSession, student_id: UUID, status: str
     ) -> list[FeeInvoice]:
+        normalized = status.strip().upper() if status else ""
         result = await session.execute(
             select(FeeInvoice)
             .where(FeeInvoice.student_id == student_id)
-            .where(FeeInvoice.status == status)
+            .where(func.upper(FeeInvoice.status) == normalized)
+        )
+        return list(result.scalars().all())
+
+    async def get_by_status(
+        self, session: AsyncSession, status: str
+    ) -> list[FeeInvoice]:
+        normalized = status.strip().upper() if status else ""
+        result = await session.execute(
+            select(FeeInvoice).where(func.upper(FeeInvoice.status) == normalized)
         )
         return list(result.scalars().all())
 
