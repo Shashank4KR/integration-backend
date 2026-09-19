@@ -119,6 +119,7 @@ from app.api.v1.users import (
     admin_router,
     user_router,
 )
+from app.api.v1.roles import permission_router, role_router
 
 api_router = APIRouter()
 
@@ -128,6 +129,8 @@ api_router.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboar
 # Users & Admins
 api_router.include_router(admin_router, prefix="/admins", tags=["Admins"])
 api_router.include_router(user_router, tags=["Users"])
+api_router.include_router(role_router, prefix="/roles", tags=["Roles"])
+api_router.include_router(permission_router, prefix="/permissions", tags=["Permissions"])
 
 # Academics
 api_router.include_router(department_router, prefix="/departments", tags=["Departments"])
