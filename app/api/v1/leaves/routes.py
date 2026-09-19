@@ -109,6 +109,7 @@ async def get_leave_summary(session: AsyncSession = Depends(get_db)):
 
 
 @leave_request_router.patch("/{leave_id}/approve", response_model=LeaveRequestResponse)
+@leave_request_router.post("/{leave_id}/approve", response_model=LeaveRequestResponse)
 async def approve_leave(
     leave_id: UUID,
     payload: LeaveApprovalRequest = Body(default=LeaveApprovalRequest()),
@@ -120,6 +121,7 @@ async def approve_leave(
 
 
 @leave_request_router.patch("/{leave_id}/reject", response_model=LeaveRequestResponse)
+@leave_request_router.post("/{leave_id}/reject", response_model=LeaveRequestResponse)
 async def reject_leave(
     leave_id: UUID,
     payload: LeaveApprovalRequest = Body(default=LeaveApprovalRequest()),
@@ -131,6 +133,7 @@ async def reject_leave(
 
 
 @leave_request_router.patch("/{leave_id}/cancel", response_model=LeaveRequestResponse)
+@leave_request_router.post("/{leave_id}/cancel", response_model=LeaveRequestResponse)
 async def cancel_leave(leave_id: UUID, session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
