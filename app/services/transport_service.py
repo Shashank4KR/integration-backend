@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.student_model import Student
-from app.models.transport_model import Bus, Route, StudentTransport, Driver
+from app.models.transport_model import Bus, Route, RouteStop, StudentTransport, Driver
 from app.repositories.transport_repository import (
     bus_repository,
     driver_repository,
@@ -39,16 +39,60 @@ class BusService(CRUDService):
 
 
 class RouteService(CRUDService):
-    async def create_route(self, session: AsyncSession, data: dict):
+    async def create(self, session: AsyncSession, data: dict):
+        stops_data = data.pop("stops", None)
         self._validate_route(data)
+        item = await super().create(session, data)
+        if stops_data:
+            for idx, s in enumerate(stops_data):
+                stop_dict = s if isinstance(s, dict) else s.model_dump()
+                route_stop = RouteStop(
+                    route_id=item.id,
+                    stop_name=stop_dict.get("stop_name", "").strip(),
+                    stop_order=stop_dict.get("stop_order", idx + 1),
+                    pickup_time=stop_dict.get("pickup_time"),
+                )
+                session.add(route_stop)
+            await session.commit()
+            await session.refresh(item)
+        return item
+
+    async def create_route(self, session: AsyncSession, data: dict):
         return await self.create(session, data)
-    async def update_route(self, session: AsyncSession, item_id: UUID, data: dict):
+
+    async def update(self, session: AsyncSession, item_id: UUID, data: dict):
+        stops_data = data.pop("stops", None)
         existing = await self.get(session, item_id)
         self._validate_route(data, existing)
+        item = await super().update(session, item_id, data)
+        if stops_data is not None:
+            from sqlalchemy import delete
+            await session.execute(delete(RouteStop).where(RouteStop.route_id == item_id))
+            for idx, s in enumerate(stops_data):
+                stop_dict = s if isinstance(s, dict) else s.model_dump()
+                route_stop = RouteStop(
+                    route_id=item.id,
+                    stop_name=stop_dict.get("stop_name", "").strip(),
+                    stop_order=stop_dict.get("stop_order", idx + 1),
+                    pickup_time=stop_dict.get("pickup_time"),
+                )
+                session.add(route_stop)
+            await session.commit()
+            await session.refresh(item)
+        return item
+
+    async def update_route(self, session: AsyncSession, item_id: UUID, data: dict):
         return await self.update(session, item_id, data)
-    async def delete_route(self, session: AsyncSession, item_id: UUID): return await self.delete(session, item_id)
-    async def get_route(self, session: AsyncSession, item_id: UUID): return await self.get(session, item_id)
-    async def get_routes(self, session: AsyncSession): return await self.list(session)
+
+    async def delete_route(self, session: AsyncSession, item_id: UUID):
+        return await self.delete(session, item_id)
+
+    async def get_route(self, session: AsyncSession, item_id: UUID):
+        return await self.get(session, item_id)
+
+    async def get_routes(self, session: AsyncSession):
+        return await self.list(session)
+
     def _validate_route(self, data: dict, existing=None):
         for field, label in (("route_name", "Route name"), ("start_point", "Start point"), ("end_point", "End point")):
             if field in data and not data[field].strip(): _bad_request(f"{label} cannot be empty")

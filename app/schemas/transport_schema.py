@@ -23,21 +23,41 @@ class BusResponse(BusCreate):
     updated_at: datetime
 
 
+class RouteStopCreate(BaseModel):
+    stop_name: str
+    stop_order: int = 1
+    pickup_time: str | None = None
+
+
+class RouteStopResponse(RouteStopCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    route_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
 class RouteCreate(BaseModel):
     route_name: str
     start_point: str
     end_point: str
+    stops: list[RouteStopCreate] | None = []
 
 
 class RouteUpdate(BaseModel):
     route_name: str | None = None
     start_point: str | None = None
     end_point: str | None = None
+    stops: list[RouteStopCreate] | None = None
 
 
-class RouteResponse(RouteCreate):
+class RouteResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    route_name: str
+    start_point: str
+    end_point: str
+    stops: list[RouteStopResponse] = []
     created_at: datetime
     updated_at: datetime
 
