@@ -36,9 +36,6 @@ venv.bak/
 *.swo
 *~
 
-# Environment variables
-.env
-
 # OS
 .DS_Store
 Thumbs.db
@@ -61,5 +58,6 @@ local_settings.py
 db.sqlite3
 uploads/
 
-testignore
-
+# Local audit artifacts
+audit_results.json
+deep_backend_audit.json
