@@ -21,6 +21,27 @@ def _ensure_admin_or_teacher(current_user: User) -> None:
         )
 
 
+@router.get("", response_model=list[ReportCardResponse])
+async def list_report_cards(
+    class_id: UUID | None = None,
+    exam_id: UUID | None = None,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from sqlalchemy import select
+    from app.models.report_card_model import ReportCard
+    from app.models.student_model import Student
+
+    query = select(ReportCard)
+    if exam_id is not None:
+        query = query.where(ReportCard.exam_id == exam_id)
+    if class_id is not None:
+        query = query.join(Student, Student.id == ReportCard.student_id).where(Student.class_id == class_id)
+
+    result = await session.execute(query)
+    return list(result.scalars().all())
+
+
 @router.post("/generate", response_model=ReportCardResponse)
 async def generate_report_card(
     payload: ReportCardGenerate,
