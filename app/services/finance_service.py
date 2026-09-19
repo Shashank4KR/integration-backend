@@ -123,19 +123,24 @@ class FinanceService:
 
     async def get_transactions(self, session: AsyncSession) -> list[dict]:
         payment_query = (
-            select(Payment, FeeInvoice, FeeStructure, Student)
+            select(Payment, FeeInvoice, FeeStructure, Student, Class)
             .join(FeeInvoice, Payment.invoice_id == FeeInvoice.id)
             .join(FeeStructure, FeeInvoice.fee_type_id == FeeStructure.id)
             .join(Student, FeeInvoice.student_id == Student.id)
+            .outerjoin(Class, Student.class_id == Class.id)
             .order_by(Payment.payment_date.desc())
         )
         result = await session.execute(payment_query)
         rows = result.all()
 
         transactions: list[dict] = []
-        for payment, invoice, fee_structure, student in rows:
+        for payment, invoice, fee_structure, student, cls in rows:
             full_name = (
                 f"{student.first_name or ''} {student.last_name or ''}".strip()
+            )
+            class_label = (
+                student.class_name
+                or (f"{cls.class_name} - {cls.section}" if cls and cls.section else cls.class_name if cls else "")
             )
             transactions.append(
                 {
@@ -147,7 +152,8 @@ class FinanceService:
                     if payment.payment_date
                     else "",
                     "student_name": full_name or "Unknown",
-                    "class_grade": student.class_name or "",
+                    "class_grade": class_label,
+                    "academic_year": cls.academic_year if cls else "",
                     "type": fee_structure.fee_type or "",
                     "fee_type": fee_structure.fee_type or "",
                     "amount": float(payment.amount_paid),
