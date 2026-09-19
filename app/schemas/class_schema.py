@@ -10,6 +10,8 @@ class ClassCreate(BaseModel):
     section: str = Field(..., min_length=1, max_length=50)
     academic_year: str = Field(..., min_length=1, max_length=20)
     class_teacher_id: Optional[UUID] = None
+    room_number: Optional[str] = Field(None, max_length=50)
+    status: Optional[str] = Field("ACTIVE", max_length=20)
 
 
 class ClassUpdate(BaseModel):
@@ -17,6 +19,8 @@ class ClassUpdate(BaseModel):
     section: Optional[str] = Field(None, min_length=1, max_length=50)
     academic_year: Optional[str] = Field(None, min_length=1, max_length=20)
     class_teacher_id: Optional[UUID] = None
+    room_number: Optional[str] = Field(None, max_length=50)
+    status: Optional[str] = Field(None, max_length=20)
 
 
 class ClassResponse(BaseModel):
@@ -27,6 +31,8 @@ class ClassResponse(BaseModel):
     section: str
     academic_year: str
     class_teacher_id: Optional[UUID] = None
+    room_number: Optional[str] = None
+    status: Optional[str] = "ACTIVE"
     created_at: datetime
     updated_at: datetime
 

@@ -20,6 +20,10 @@ class Class(Base):
     class_teacher_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("teachers.id"), nullable=True
     )
+    room_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    status: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, default="ACTIVE", server_default="ACTIVE"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
