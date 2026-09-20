@@ -46,6 +46,13 @@ async def add_security_headers(request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+    )
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' http: https: ws: wss:; frame-ancestors 'none';",
+    )
     return response
 
 
@@ -54,7 +61,7 @@ async def audit_business_actions(request, call_next):
     response = await call_next(request)
     if response.status_code >= 400 or request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
         return response
-    if request.url.path.startswith(("/login", "/logout", "/audit", "/login-history", "/audit-logs")):
+    if request.url.path.startswith(("/login", "/logout", "/audit", "/login-history", "/audit-logs", "/auth/")):
         return response
     authorization = request.headers.get("authorization", "")
     if not authorization.lower().startswith("bearer "):
