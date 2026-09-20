@@ -1,6 +1,7 @@
+from datetime import datetime
 import uuid
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship as orm_relationship
 
@@ -23,6 +24,12 @@ class ParentStudent(Base):
         UUID(as_uuid=True), ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
     relationship: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     parent = orm_relationship("Parent", back_populates="parent_students", lazy="selectin")
     student = orm_relationship("Student", back_populates="parent_students", lazy="selectin")
