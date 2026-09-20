@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
@@ -26,8 +26,14 @@ async def get_login_history_record(record_id: UUID, session: AsyncSession = Depe
 
 
 @audit_log_router.get("", response_model=list[AuditLogResponse])
-async def get_audit_logs(session: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    return await audit_log_service.get_logs(session)
+async def get_audit_logs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    session: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    return await audit_log_service.get_logs(session, skip=skip, limit=limit)
+
 
 
 @audit_log_router.get("/{log_id}", response_model=AuditLogResponse)
@@ -56,8 +62,15 @@ async def user_login_history(user_id: UUID, session: AsyncSession = Depends(get_
 
 
 @user_audit_router.get("/{user_id}/audit-logs", response_model=list[AuditLogResponse])
-async def user_audit_logs(user_id: UUID, session: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    return await audit_log_service.get_user_logs(session, user_id)
+async def user_audit_logs(
+    user_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    session: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    return await audit_log_service.get_user_logs(session, user_id, skip=skip, limit=limit)
+
 
 
 @user_audit_router.get("/{user_id}/activity-timeline")

@@ -55,8 +55,8 @@ class AuditLogService:
             await session.commit()
         return item
 
-    async def get_logs(self, session: AsyncSession):
-        return await audit_log_repository.get_all(session)
+    async def get_logs(self, session: AsyncSession, skip: int = 0, limit: int = 100):
+        return await audit_log_repository.get_all(session, skip=skip, limit=limit)
 
     async def get_log(self, session: AsyncSession, log_id: UUID):
         item = await audit_log_repository.get_by_id(session, log_id)
@@ -64,9 +64,9 @@ class AuditLogService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit log not found")
         return item
 
-    async def get_user_logs(self, session: AsyncSession, user_id: UUID):
+    async def get_user_logs(self, session: AsyncSession, user_id: UUID, skip: int = 0, limit: int = 100):
         await _ensure_user(session, user_id)
-        return await audit_log_repository.get_by_user(session, user_id)
+        return await audit_log_repository.get_by_user(session, user_id, skip=skip, limit=limit)
 
     async def security_dashboard(self, session: AsyncSession) -> dict:
         today = datetime.now(timezone.utc).date()
@@ -76,7 +76,7 @@ class AuditLogService:
         return {"total_logins_today": logins or 0, "active_sessions": active or 0, "audit_logs_today": logs or 0}
 
     async def recent_activities(self, session: AsyncSession):
-        return (await self.get_logs(session))[:20]
+        return await audit_log_repository.get_recent(session, limit=20)
 
     async def user_activity_timeline(self, session: AsyncSession, user_id: UUID):
         logs = await self.get_user_logs(session, user_id)
@@ -90,7 +90,12 @@ class AuditLogService:
         now = datetime.now(timezone.utc)
         async def count_since(since):
             return (await session.scalar(select(func.count(LoginHistory.id)).where(LoginHistory.login_time >= since))) or 0
-        return {"today": await count_since(now.replace(hour=0, minute=0, second=0, microsecond=0)), "this_week": await count_since(now - timedelta(days=now.weekday())), "this_month": await count_since(now.replace(day=1, hour=0, minute=0, second=0, microsecond=0))}
+        week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        return {
+            "today": await count_since(now.replace(hour=0, minute=0, second=0, microsecond=0)),
+            "this_week": await count_since(week_start),
+            "this_month": await count_since(now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)),
+        }
 
 
 async def _ensure_user(session: AsyncSession, user_id: UUID) -> None:
