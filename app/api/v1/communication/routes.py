@@ -1,7 +1,10 @@
+import logging
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.models.communication_model import Announcement, Message, Notification
@@ -273,8 +276,8 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
             u = await session.get(User, target_uuid)
             if u:
                 target_users.append(u)
-        except ValueError:
-            pass
+        except ValueError as e:
+            logger.debug(f"Target '{clean_target}' is not a valid UUID, falling back to name/email lookup: {e}")
 
     # 2. Try match by username or email
     if not target_users and clean_target:
@@ -373,6 +376,16 @@ async def delete_message(item_id: UUID, session: AsyncSession = Depends(get_db),
 @message_router.patch("/{item_id}/read", response_model=MessageResponse)
 async def mark_message_read(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await message_service.mark_as_read(session, item_id)
+
+
+@message_router.post("/read-all")
+@message_router.patch("/read-all")
+async def mark_all_messages_read(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await message_service.mark_all_as_read(session, current_user.id)
+
 
 user_communication_router = APIRouter()
 @user_communication_router.get("/{user_id}/notifications", response_model=list[NotificationResponse])

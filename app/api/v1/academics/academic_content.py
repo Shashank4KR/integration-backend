@@ -1,8 +1,11 @@
+import logging
 import os
 import uuid
 from datetime import date
 from typing import List, Optional
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
@@ -481,8 +484,8 @@ async def delete_chapter_note(
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to remove note file {file_path}: {e}")
 
     await session.delete(note)
     await session.commit()

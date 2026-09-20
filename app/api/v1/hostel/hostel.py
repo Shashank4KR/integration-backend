@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from uuid import UUID
 
@@ -29,17 +30,19 @@ from app.services.audit_service import audit_log_service
 from app.services.communication_service import notification_service
 from app.services.hostel_service import hostel_allocation_service, hostel_bed_service, hostel_block_service, hostel_room_service
 
+logger = logging.getLogger(__name__)
+
 async def _audit(session, user_id, activity, details):
     try:
         await audit_log_service.create_log(session, {"user_id": user_id, "activity": activity, "details": details})
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Hostel audit log failed: {e}")
 
 async def _notify(session, user_id, title, message):
     try:
         await notification_service.create(session, {"user_id": user_id, "title": title, "message": message})
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Hostel notification failed: {e}")
 
 def _ensure_admin_or_warden(current_user: User) -> None:
     role_name = (current_user.role.role_name if current_user.role else "").upper()

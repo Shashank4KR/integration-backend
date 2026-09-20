@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -8,6 +9,8 @@ from app.core.database import get_db
 from app.models.user import User
 from app.schemas.exam_schema import ReportCardGenerate, ReportCardResponse
 from app.services.report_card_service import report_card_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -84,8 +87,8 @@ async def publish_exam_results(
                 session, student.id, exam_id, remarks="Published exam result"
             )
             generated += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to generate report card for student {student.id} in exam {exam_id}: {e}")
 
     return {"message": f"Successfully published results. Generated {generated} report cards."}
 
