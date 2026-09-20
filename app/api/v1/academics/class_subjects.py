@@ -1,33 +1,59 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
+from app.models.user import User
 from app.schemas.class_subject_schema import ClassSubjectCreate, ClassSubjectResponse
 from app.services.class_subject_service import class_subject_service
 
 router = APIRouter()
 
 
+def _ensure_admin_or_teacher(current_user: User) -> None:
+    role_name = current_user.role.role_name.upper() if current_user.role else ""
+    if role_name not in ("ADMIN", "TEACHER"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin or teacher users can perform this action",
+        )
+
+
 @router.post("", response_model=ClassSubjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_class_subject(
-    payload: ClassSubjectCreate, session: AsyncSession = Depends(get_db)
+    payload: ClassSubjectCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ensure_admin_or_teacher(current_user)
     return await class_subject_service.create(session, payload.model_dump())
 
 
 @router.get("", response_model=list[ClassSubjectResponse])
-async def list_class_subjects(session: AsyncSession = Depends(get_db)):
+async def list_class_subjects(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await class_subject_service.list(session)
 
 
 @router.get("/{item_id}", response_model=ClassSubjectResponse)
-async def get_class_subject(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_class_subject(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await class_subject_service.get(session, item_id)
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_200_OK)
-async def delete_class_subject(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def delete_class_subject(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_teacher(current_user)
     await class_subject_service.delete(session, item_id)
     return {"message": "Deleted successfully"}

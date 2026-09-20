@@ -7,6 +7,7 @@ from app.api.v1.auth.routes import get_current_user
 from app.models.parent_model import Parent
 from app.models.parent_student_model import ParentStudent
 from app.models.student_model import Student
+from app.models.fee_model import FeeInvoice, Payment
 from app.models.user import User
 from app.schemas.fee_schema import FeeInvoiceCreate, FeeInvoiceResponse, FeeInvoiceUpdate, FeeStructureCreate, FeeStructureResponse, FeeStructureUpdate, FeeSummaryResponse, PaymentCreate, PaymentResponse, PaymentUpdate
 from app.services.fee_service import fee_invoice_service, fee_structure_service, payment_service
@@ -95,34 +96,114 @@ async def list_fee_invoices(
     status: str | None = None,
     student_id: UUID | None = None,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    if student_id and status:
-        return await fee_invoice_service.get_by_student_and_status(session, student_id, status)
-    elif student_id:
-        return await fee_invoice_service.get_by_student(session, student_id)
-    return await fee_invoice_service.list(session, status=status)
+    role_name = current_user.role.role_name.upper() if current_user.role else ""
+    if role_name in ("ADMIN", "ACCOUNTANT"):
+        if student_id and status:
+            return await fee_invoice_service.get_by_student_and_status(session, student_id, status)
+        elif student_id:
+            return await fee_invoice_service.get_by_student(session, student_id)
+        return await fee_invoice_service.list(session, status=status)
+
+    if role_name == "STUDENT":
+        student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
+        student = student_res.scalar_one_or_none()
+        if not student:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student profile not found")
+        if student_id and student_id != student.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access other students' fee invoices")
+        resolved_student_id = student.id
+    elif role_name == "PARENT":
+        if not student_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="student_id is required for parent access")
+        await _ensure_student_fee_access(session, current_user, student_id)
+        resolved_student_id = student_id
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    if status:
+        return await fee_invoice_service.get_by_student_and_status(session, resolved_student_id, status)
+    return await fee_invoice_service.get_by_student(session, resolved_student_id)
+
 @fee_invoice_router.get("/{item_id}", response_model=FeeInvoiceResponse)
-async def get_fee_invoice(item_id: UUID, session: AsyncSession = Depends(get_db)): return await fee_invoice_service.get(session, item_id)
+async def get_fee_invoice(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    invoice = await fee_invoice_service.get(session, item_id)
+    await _ensure_student_fee_access(session, current_user, invoice.student_id)
+    return invoice
+
 @fee_invoice_router.put("/{item_id}", response_model=FeeInvoiceResponse)
 async def update_fee_invoice(item_id: UUID, payload: FeeInvoiceUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin_or_accountant(current_user)
     return await fee_invoice_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+
 @fee_invoice_router.delete("/{item_id}")
 async def delete_fee_invoice(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin_or_accountant(current_user)
     await fee_invoice_service.delete(session, item_id); return {"message": "Deleted successfully"}
+
 @fee_invoice_router.get("/{invoice_id}/payments", response_model=list[PaymentResponse])
-async def invoice_payments(invoice_id: UUID, session: AsyncSession = Depends(get_db)): return await payment_service.get_by_invoice(session, invoice_id)
+async def invoice_payments(
+    invoice_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    invoice = await fee_invoice_service.get(session, invoice_id)
+    await _ensure_student_fee_access(session, current_user, invoice.student_id)
+    return await payment_service.get_by_invoice(session, invoice_id)
 
 payment_router = APIRouter()
+
 @payment_router.post("", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
 async def create_payment(payload: PaymentCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin_or_accountant(current_user)
     return await payment_service.create(session, payload.model_dump())
+
 @payment_router.get("", response_model=list[PaymentResponse])
-async def list_payments(session: AsyncSession = Depends(get_db)): return await payment_service.list(session)
+async def list_payments(
+    student_id: UUID | None = None,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_name = current_user.role.role_name.upper() if current_user.role else ""
+    if role_name in ("ADMIN", "ACCOUNTANT"):
+        if student_id:
+            return await payment_service.get_by_student(session, student_id)
+        return await payment_service.list(session)
+
+    if role_name == "STUDENT":
+        student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
+        student = student_res.scalar_one_or_none()
+        if not student:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Student profile not found")
+        if student_id and student_id != student.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access other students' payments")
+        return await payment_service.get_by_student(session, student.id)
+    elif role_name == "PARENT":
+        if not student_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="student_id is required for parent access")
+        await _ensure_student_fee_access(session, current_user, student_id)
+        return await payment_service.get_by_student(session, student_id)
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
 @payment_router.get("/{item_id}", response_model=PaymentResponse)
-async def get_payment(item_id: UUID, session: AsyncSession = Depends(get_db)): return await payment_service.get(session, item_id)
+async def get_payment(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    payment = await payment_service.get(session, item_id)
+    invoice = await session.get(FeeInvoice, payment.invoice_id)
+    if invoice:
+        await _ensure_student_fee_access(session, current_user, invoice.student_id)
+    else:
+        _ensure_admin_or_accountant(current_user)
+    return payment
 @payment_router.put("/{item_id}", response_model=PaymentResponse)
 async def update_payment(item_id: UUID, payload: PaymentUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin_or_accountant(current_user)

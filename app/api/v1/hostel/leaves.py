@@ -1,43 +1,88 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.hostel_operations_schema import HostelLeaveRequestCreate, HostelLeaveRequestResponse, HostelLeaveRequestUpdate
 from app.services.hostel_operations_service import hostel_leave_request_service
 from app.api.v1.auth.routes import get_current_user
 from app.models.user import User
+from app.models.student_model import Student
 
 hostel_leave_router = APIRouter()
+
+def _ensure_admin_or_warden(current_user: User) -> None:
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "WARDEN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin or warden users can perform this action",
+        )
 
 @hostel_leave_router.post("", response_model=HostelLeaveRequestResponse, status_code=status.HTTP_201_CREATED)
 async def create_leave_request(payload: HostelLeaveRequestCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_leave_request_service.create(session, payload.model_dump())
 
 @hostel_leave_router.get("", response_model=list[HostelLeaveRequestResponse])
-async def list_leave_requests(session: AsyncSession = Depends(get_db)):
+async def list_leave_requests(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_leave_request_service.list(session)
 
 @hostel_leave_router.get("/{item_id}", response_model=HostelLeaveRequestResponse)
-async def get_leave_request(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_leave_request(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_leave_request_service.get(session, item_id)
 
 @hostel_leave_router.put("/{item_id}", response_model=HostelLeaveRequestResponse)
-async def update_leave_request(item_id: UUID, payload: HostelLeaveRequestUpdate, session: AsyncSession = Depends(get_db)):
+async def update_leave_request(
+    item_id: UUID,
+    payload: HostelLeaveRequestUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    leave = await hostel_leave_request_service.get(session, item_id)
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "WARDEN"):
+        student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
+        student = student_res.scalar_one_or_none()
+        if not student or student.id != leave.student_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this leave request",
+            )
     return await hostel_leave_request_service.update(session, item_id, payload.model_dump(exclude_unset=True))
 
 @hostel_leave_router.delete("/{item_id}")
-async def delete_leave_request(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def delete_leave_request(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_warden(current_user)
     await hostel_leave_request_service.delete(session, item_id)
     return {"message": "Deleted successfully"}
 
 @hostel_leave_router.patch("/{item_id}/approve", response_model=HostelLeaveRequestResponse)
 async def approve_leave_request(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin_or_warden(current_user)
     return await hostel_leave_request_service.approve(session, item_id, {"approved_by": current_user.id})
 
 @hostel_leave_router.patch("/{item_id}/reject", response_model=HostelLeaveRequestResponse)
 async def reject_leave_request(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin_or_warden(current_user)
     return await hostel_leave_request_service.reject(session, item_id, {"approved_by": current_user.id})
 
 @hostel_leave_router.get("/student/{student_id}", response_model=list[HostelLeaveRequestResponse])
-async def student_leave_requests(student_id: UUID, session: AsyncSession = Depends(get_db)):
+async def student_leave_requests(
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "WARDEN"):
+        student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
+        student = student_res.scalar_one_or_none()
+        if not student or student.id != student_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view these leave requests",
+            )
     return await hostel_leave_request_service.repository.get_by_field(session, "student_id", student_id)
