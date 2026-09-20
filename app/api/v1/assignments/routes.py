@@ -51,9 +51,37 @@ async def assignment_summary(assignment_id: UUID, session: AsyncSession = Depend
 submission_router = APIRouter()
 
 
+async def _resolve_authenticated_student_id(session: AsyncSession, current_user: User) -> UUID:
+    from fastapi import HTTPException
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name != "STUDENT":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can submit assignments",
+        )
+    from app.models.student_model import Student
+    from sqlalchemy import select
+    student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
+    student = student_res.scalar_one_or_none()
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Student profile not found",
+        )
+    return student.id
+
+
 @submission_router.post("", response_model=AssignmentSubmissionResponse, status_code=status.HTTP_201_CREATED)
-async def submit_assignment(payload: AssignmentSubmissionCreate, session: AsyncSession = Depends(get_db)):
-    return await submission_service.submit_assignment(session, payload.model_dump(exclude_none=True))
+async def submit_assignment(
+    payload: AssignmentSubmissionCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Enforce that student_id is resolved from the authenticated user, ignoring/overriding any spoofed student_id in body
+    resolved_student_id = await _resolve_authenticated_student_id(session, current_user)
+    submission_data = payload.model_dump(exclude_none=True)
+    submission_data["student_id"] = resolved_student_id
+    return await submission_service.submit_assignment(session, submission_data)
 
 @submission_router.get("", response_model=list[AssignmentSubmissionResponse])
 async def get_submissions(session: AsyncSession = Depends(get_db)): return await submission_service.get_submissions(session)
