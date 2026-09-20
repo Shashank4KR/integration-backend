@@ -54,6 +54,14 @@ class MessageService(CRUDService):
         if await session.get(User, data["sender_id"]) is None or await session.get(User, data["receiver_id"]) is None: raise HTTPException(status_code=400, detail="Sender and receiver must be valid users")
     async def send_message(self, session, data): return await self.create(session, data)
     async def mark_as_read(self, session, item_id): return await self.update(session, item_id, {"is_read": True})
+    async def mark_all_as_read(self, session, user_id):
+        from app.models.communication_model import Message
+        from sqlalchemy import update
+        await session.execute(
+            update(Message).where(Message.receiver_id == user_id, Message.is_read == False).values(is_read=True)
+        )
+        await session.commit()
+        return {"message": "All messages marked as read"}
     async def get_conversation(self, session, sender_id, receiver_id): return await self.repository.get_conversation(session, sender_id, receiver_id)
     async def get_user_messages(self, session, user_id):
         return await self.repository.get_sent_messages(session, user_id) + await self.repository.get_received_messages(session, user_id)
