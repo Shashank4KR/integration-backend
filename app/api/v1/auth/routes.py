@@ -1,4 +1,5 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -12,6 +13,8 @@ from app.services.auth_service import AuthService
 from app.schemas.user import UserCreate, UserCreateResponse, UserResponse
 from app.models.user import User
 from app.services.audit_service import audit_log_service, login_history_service
+
+logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
@@ -58,8 +61,8 @@ async def get_current_user(
                 )
         except HTTPException:
             raise
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Error checking maintenance mode in get_current_user: {e}")
 
     return user
 
@@ -119,9 +122,27 @@ async def login(
     )
     user = result.scalar_one_or_none()
 
+    # Check per-account lockout
+    if user and user.locked_until:
+        now_utc = datetime.now(timezone.utc)
+        if user.locked_until > now_utc:
+            remaining_mins = max(1, int((user.locked_until - now_utc).total_seconds() // 60) + 1)
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail=f"Account is temporarily locked due to repeated failed logins. Please try again in {remaining_mins} minutes.",
+            )
+
     if user is None or not AuthService.verify_password(
         form_data.password, user.password_hash
     ):
+        if user:
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            if user.failed_login_attempts >= 5:
+                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+                logger.warning(f"User account '{user.username}' locked due to 5 consecutive failed login attempts.")
+            db.add(user)
+            await db.commit()
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -147,8 +168,14 @@ async def login(
                 )
         except HTTPException:
             raise
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Error checking maintenance mode in login: {e}")
+
+    # Reset failed login count and lockout on successful authentication
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_login = datetime.now(timezone.utc)
+    db.add(user)
 
     login_record = await login_history_service.create_login_record(db, {
         "user_id": user.id,
@@ -165,7 +192,11 @@ async def login(
         expires_delta=timedelta(minutes=AuthService.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "must_change_password": bool(user.must_change_password),
+    }
 
 
 @router.post("/logout")
@@ -179,8 +210,8 @@ async def logout(
     if session_id:
         try:
             await login_history_service.update_logout_record(db, UUID(session_id), commit=False)
-        except (ValueError, HTTPException):
-            pass
+        except (ValueError, HTTPException) as e:
+            logger.debug(f"Logout record update error: {e}")
     await audit_log_service.create_log(db, {"user_id": current_user.id, "activity": "User Logout", "details": "User logged out"}, commit=False)
     await db.commit()
     return {"message": "Logged out successfully"}
@@ -282,6 +313,7 @@ async def change_password(
         )
 
     current_user.password_hash = AuthService.hash_password(new_password)
+    current_user.must_change_password = False
     db.add(current_user)
     await audit_log_service.create_log(
         db,

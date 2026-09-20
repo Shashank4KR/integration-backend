@@ -1,6 +1,8 @@
 from collections import Counter
 from datetime import date
 import re
+import secrets
+import string
 import uuid
 from uuid import UUID
 
@@ -9,6 +11,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
+
+def _generate_temporary_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    while True:
+        password = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (
+            any(c.islower() for c in password)
+            and any(c.isupper() for c in password)
+            and any(c.isdigit() for c in password)
+            and any(c in "!@#$%^&*" for c in password)
+        ):
+            return password
 from app.models.admission_model import AdmissionApplicationStatus
 from app.models.class_model import Class
 from app.models.role import Role
@@ -120,13 +134,15 @@ class AdmissionApplicationService:
         username = f"{safe_name}_{unique_suffix}"
         email = f"{username}@school.internal"
 
+        temp_password = _generate_temporary_password(12)
         user = User(
             id=uuid.uuid4(),
             username=username,
             email=email,
-            password_hash=hash_password("Student@12345"),
+            password_hash=hash_password(temp_password),
             role_id=student_role.id,
             status=True,
+            must_change_password=True,
         )
         session.add(user)
         await session.flush()

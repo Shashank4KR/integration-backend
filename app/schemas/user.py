@@ -46,6 +46,7 @@ class UserResponse(BaseModel):
     avatar_url: Optional[str] = None
     status: bool
     last_login: Optional[datetime] = None
+    must_change_password: bool = False
     role_id: UUID
     role: Optional[RoleResponse] = None
     created_at: datetime
