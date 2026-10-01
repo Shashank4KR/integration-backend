@@ -14,7 +14,6 @@ ROLE_CODE_TO_NAME = {
     "0004": "STUDENT",
     "0005": "ACCOUNTANT",
     "0006": "LIBRARIAN",
-    "0007": "WARDEN",
     "0008": "SUPER_ADMIN",
 }
 

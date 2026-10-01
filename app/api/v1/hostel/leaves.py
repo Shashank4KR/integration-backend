@@ -11,12 +11,12 @@ from app.models.student_model import Student
 
 hostel_leave_router = APIRouter()
 
-def _ensure_admin_or_warden(current_user: User) -> None:
+def _ensure_admin(current_user: User) -> None:
     role_name = (current_user.role.role_name if current_user.role else "").upper()
-    if role_name not in ("ADMIN", "WARDEN"):
+    if role_name != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin or warden users can perform this action",
+            detail="Only admin users can perform this action",
         )
 
 @hostel_leave_router.post("", response_model=HostelLeaveRequestResponse, status_code=status.HTTP_201_CREATED)
@@ -40,7 +40,7 @@ async def update_leave_request(
 ):
     leave = await hostel_leave_request_service.get(session, item_id)
     role_name = (current_user.role.role_name if current_user.role else "").upper()
-    if role_name not in ("ADMIN", "WARDEN"):
+    if role_name != "ADMIN":
         student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
         student = student_res.scalar_one_or_none()
         if not student or student.id != leave.student_id:
@@ -56,18 +56,18 @@ async def delete_leave_request(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     await hostel_leave_request_service.delete(session, item_id)
     return {"message": "Deleted successfully"}
 
 @hostel_leave_router.patch("/{item_id}/approve", response_model=HostelLeaveRequestResponse)
 async def approve_leave_request(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_leave_request_service.approve(session, item_id, {"approved_by": current_user.id})
 
 @hostel_leave_router.patch("/{item_id}/reject", response_model=HostelLeaveRequestResponse)
 async def reject_leave_request(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_leave_request_service.reject(session, item_id, {"approved_by": current_user.id})
 
 @hostel_leave_router.get("/student/{student_id}", response_model=list[HostelLeaveRequestResponse])
@@ -77,7 +77,7 @@ async def student_leave_requests(
     current_user: User = Depends(get_current_user),
 ):
     role_name = (current_user.role.role_name if current_user.role else "").upper()
-    if role_name not in ("ADMIN", "WARDEN"):
+    if role_name != "ADMIN":
         student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
         student = student_res.scalar_one_or_none()
         if not student or student.id != student_id:
@@ -85,4 +85,4 @@ async def student_leave_requests(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to view these leave requests",
             )
-    return await hostel_leave_request_service.repository.get_by_field(session, "student_id", student_id)
+    return await hostel_leave_request_service.repository.get_by_field(session, "student_id", student_id)

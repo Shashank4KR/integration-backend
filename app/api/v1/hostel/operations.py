@@ -39,12 +39,12 @@ from app.services.hostel_operations_service import (
 )
 from app.services.ownership_service import check_student_ownership
 
-def _ensure_admin_or_warden(current_user: User) -> None:
-    if current_user.role.role_name not in ("ADMIN", "WARDEN"):
+def _ensure_admin(current_user: User) -> None:
+    if current_user.role.role_name != "ADMIN":
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin or warden users can perform this action",
+            detail="Only admin users can perform this action",
         )
 
 
@@ -74,17 +74,17 @@ def crud(prefix, create, response, service, role_check=None):
     return r
 
 
-visitor_router = crud('', HostelVisitorCreate, HostelVisitorResponse, visitor_service, _ensure_admin_or_warden)
+visitor_router = crud('', HostelVisitorCreate, HostelVisitorResponse, visitor_service, _ensure_admin)
 @visitor_router.get('/{item_id}', response_model=HostelVisitorResponse)
 async def visitor_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await visitor_service.get(s, item_id)
 @visitor_router.put('/{item_id}', response_model=HostelVisitorResponse)
 async def visitor_put(item_id: UUID, p: HostelVisitorUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await visitor_service.update(s, item_id, p.model_dump(exclude_unset=True))
 @visitor_router.delete('/{item_id}')
 async def visitor_del(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     await visitor_service.delete(s, item_id)
     return {'message': 'Deleted successfully'}
 
@@ -104,7 +104,7 @@ async def create_mess_menu(
     s: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     data = p.model_dump()
     if not data.get("created_by"):
         data["created_by"] = current_user.id
@@ -135,7 +135,7 @@ async def update_mess_menu(
     s: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     data = p.model_dump(exclude_unset=True)
     items_val = data.pop("items", None)
     if items_val:
@@ -157,95 +157,95 @@ async def delete_mess_menu(
     s: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     await mess_menu_service.delete(s, item_id)
     return {'message': 'Deleted successfully'}
 mess_expense_router = crud('', MessExpenseCreate, MessExpenseResponse, mess_expense_service, _ensure_admin_or_accountant)
 mess_collection_router = crud('', MessCollectionCreate, MessCollectionResponse, mess_collection_service, _ensure_admin_or_accountant)
-mess_attendance_router = crud('', MessAttendanceCreate, MessAttendanceResponse, mess_attendance_service, _ensure_admin_or_warden)
-maintenance_router = crud('', MaintenanceRequestCreate, MaintenanceRequestResponse, maintenance_request_service, _ensure_admin_or_warden)
-work_order_router = crud('', WorkOrderCreate, WorkOrderResponse, work_order_service, _ensure_admin_or_warden)
+mess_attendance_router = crud('', MessAttendanceCreate, MessAttendanceResponse, mess_attendance_service, _ensure_admin)
+maintenance_router = crud('', MaintenanceRequestCreate, MaintenanceRequestResponse, maintenance_request_service, _ensure_admin)
+work_order_router = crud('', WorkOrderCreate, WorkOrderResponse, work_order_service, _ensure_admin)
 @work_order_router.post('/{item_id}/complete', response_model=WorkOrderResponse)
 async def complete(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await work_order_service.complete(s, item_id)
 
-hostel_complaint_router = crud('', HostelComplaintCreate, HostelComplaintResponse, hostel_complaint_service, _ensure_admin_or_warden)
+hostel_complaint_router = crud('', HostelComplaintCreate, HostelComplaintResponse, hostel_complaint_service, _ensure_admin)
 @hostel_complaint_router.get('/{item_id}', response_model=HostelComplaintResponse)
 async def complaint_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_complaint_service.get(s, item_id)
 @hostel_complaint_router.put('/{item_id}', response_model=HostelComplaintResponse)
 async def complaint_put(item_id: UUID, p: HostelComplaintUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_complaint_service.update(s, item_id, p.model_dump(exclude_unset=True))
 @hostel_complaint_router.delete('/{item_id}')
 async def complaint_del(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     await hostel_complaint_service.delete(s, item_id)
     return {'message': 'Deleted successfully'}
 @hostel_complaint_router.patch('/{item_id}/resolve', response_model=HostelComplaintResponse)
 async def complaint_resolve(item_id: UUID, p: HostelComplaintUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_complaint_service.resolve(s, item_id, p.model_dump(exclude_unset=True))
 @hostel_complaint_router.get('/summary', response_model=HostelComplaintSummaryResponse)
 async def complaint_summary(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_complaint_service.list(s)
 
-hostel_notice_router = crud('', HostelNoticeCreate, HostelNoticeResponse, hostel_notice_service, _ensure_admin_or_warden)
+hostel_notice_router = crud('', HostelNoticeCreate, HostelNoticeResponse, hostel_notice_service, _ensure_admin)
 @hostel_notice_router.get('/{item_id}', response_model=HostelNoticeResponse)
 async def notice_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_notice_service.get(s, item_id)
 @hostel_notice_router.put('/{item_id}', response_model=HostelNoticeResponse)
 async def notice_put(item_id: UUID, p: HostelNoticeUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_notice_service.update(s, item_id, p.model_dump(exclude_unset=True))
 @hostel_notice_router.delete('/{item_id}')
 async def notice_del(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     await hostel_notice_service.delete(s, item_id)
     return {'message': 'Deleted successfully'}
 @hostel_notice_router.patch('/{item_id}/publish', response_model=HostelNoticeResponse)
 async def notice_publish(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_notice_service.publish(s, item_id)
 @hostel_notice_router.get('/published', response_model=list[HostelNoticeResponse])
 async def published_notices(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_notice_service.list_published(s)
 
-hostel_setting_router = crud('', HostelSettingCreate, HostelSettingResponse, hostel_setting_service, _ensure_admin_or_warden)
+hostel_setting_router = crud('', HostelSettingCreate, HostelSettingResponse, hostel_setting_service, _ensure_admin)
 @hostel_setting_router.get('/{item_id}', response_model=HostelSettingResponse)
 async def setting_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_setting_service.get(s, item_id)
 @hostel_setting_router.put('/{item_id}', response_model=HostelSettingResponse)
 async def setting_put(item_id: UUID, p: HostelSettingUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_setting_service.update(s, item_id, p.model_dump(exclude_unset=True))
 @hostel_setting_router.delete('/{item_id}')
 async def setting_del(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     await hostel_setting_service.delete(s, item_id)
     return {'message': 'Deleted successfully'}
 
-hostel_leave_router = crud('', HostelLeaveRequestCreate, HostelLeaveRequestResponse, hostel_leave_request_service, _ensure_admin_or_warden)
+hostel_leave_router = crud('', HostelLeaveRequestCreate, HostelLeaveRequestResponse, hostel_leave_request_service, _ensure_admin)
 @hostel_leave_router.get('/{item_id}', response_model=HostelLeaveRequestResponse)
 async def leave_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_leave_request_service.get(s, item_id)
 @hostel_leave_router.put('/{item_id}', response_model=HostelLeaveRequestResponse)
 async def leave_put(item_id: UUID, p: HostelLeaveRequestUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_leave_request_service.update(s, item_id, p.model_dump(exclude_unset=True))
 @hostel_leave_router.delete('/{item_id}')
 async def leave_del(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     await hostel_leave_request_service.delete(s, item_id)
     return {'message': 'Deleted successfully'}
 @hostel_leave_router.patch('/{item_id}/approve', response_model=HostelLeaveRequestResponse)
 async def leave_approve(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_leave_request_service.approve(s, item_id, {'approved_by': current_user.id})
 @hostel_leave_router.patch('/{item_id}/reject', response_model=HostelLeaveRequestResponse)
 async def leave_reject(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_leave_request_service.reject(s, item_id, {'approved_by': current_user.id})
 @hostel_leave_router.get('/student/{student_id}', response_model=list[HostelLeaveRequestResponse])
 async def student_leaves(student_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -287,7 +287,7 @@ async def fee_summary(s: AsyncSession = Depends(get_db), current_user: User = De
     }
 @hostel_extra_router.get('/mess/dashboard')
 async def mess_dashboard(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return {
         'total_collections': await s.scalar(select(func.coalesce(func.sum(MessCollection.amount), 0))) or 0,
         'total_expenses': await s.scalar(select(func.coalesce(func.sum(MessExpense.amount), 0))) or 0,
@@ -296,7 +296,7 @@ async def mess_dashboard(s: AsyncSession = Depends(get_db), current_user: User =
     }
 @hostel_extra_router.get('/maintenance/dashboard')
 async def maintenance_dashboard(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return {
         'open_requests': await s.scalar(select(func.count(MaintenanceRequest.id)).where(MaintenanceRequest.status == 'OPEN')) or 0,
         'in_progress_requests': await s.scalar(select(func.count(MaintenanceRequest.id)).where(MaintenanceRequest.status == 'IN_PROGRESS')) or 0,

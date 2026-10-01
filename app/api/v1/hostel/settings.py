@@ -9,17 +9,17 @@ from app.models.user import User
 
 hostel_setting_router = APIRouter()
 
-def _ensure_admin_or_warden(current_user: User) -> None:
+def _ensure_admin(current_user: User) -> None:
     role_name = (current_user.role.role_name if current_user.role else "").upper()
-    if role_name not in ("ADMIN", "WARDEN"):
+    if role_name != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin or warden users can perform this action",
+            detail="Only admin users can perform this action",
         )
 
 @hostel_setting_router.post("", response_model=HostelSettingResponse, status_code=status.HTTP_201_CREATED)
 async def create_setting(payload: HostelSettingCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_setting_service.create(session, payload.model_dump())
 
 @hostel_setting_router.get("", response_model=list[HostelSettingResponse])
@@ -37,7 +37,7 @@ async def update_setting(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_setting_service.update(session, item_id, payload.model_dump(exclude_unset=True))
 
 @hostel_setting_router.delete("/{item_id}")
@@ -46,6 +46,6 @@ async def delete_setting(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     await hostel_setting_service.delete(session, item_id)
-    return {"message": "Deleted successfully"}
+    return {"message": "Deleted successfully"}

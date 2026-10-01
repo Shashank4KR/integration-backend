@@ -9,17 +9,17 @@ from app.models.user import User
 
 hostel_notice_router = APIRouter()
 
-def _ensure_admin_or_warden(current_user: User) -> None:
+def _ensure_admin(current_user: User) -> None:
     role_name = (current_user.role.role_name if current_user.role else "").upper()
-    if role_name not in ("ADMIN", "WARDEN"):
+    if role_name != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin or warden users can perform this action",
+            detail="Only admin users can perform this action",
         )
 
 @hostel_notice_router.post("", response_model=HostelNoticeResponse, status_code=status.HTTP_201_CREATED)
 async def create_notice(payload: HostelNoticeCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_notice_service.create(session, payload.model_dump())
 
 @hostel_notice_router.get("", response_model=list[HostelNoticeResponse])
@@ -41,7 +41,7 @@ async def update_notice(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     return await hostel_notice_service.update(session, item_id, payload.model_dump(exclude_unset=True))
 
 @hostel_notice_router.delete("/{item_id}")
@@ -50,11 +50,11 @@ async def delete_notice(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_warden(current_user)
+    _ensure_admin(current_user)
     await hostel_notice_service.delete(session, item_id)
     return {"message": "Deleted successfully"}
 
 @hostel_notice_router.patch("/{item_id}/publish", response_model=HostelNoticeResponse)
 async def publish_notice(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin_or_warden(current_user)
-    return await hostel_notice_service.publish(session, item_id)
+    _ensure_admin(current_user)
+    return await hostel_notice_service.publish(session, item_id)

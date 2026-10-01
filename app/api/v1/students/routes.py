@@ -29,7 +29,7 @@ router = build_crud_router(
     StudentCreate,
     StudentUpdate,
     StudentResponse,
-    read_roles=("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"),
+    read_roles=("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN"),
     get_checker=check_student_ownership,
 )
 
@@ -40,7 +40,7 @@ async def list_students(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_roles(current_user, ("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"))
+    require_roles(current_user, ("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN"))
     if class_id is not None:
         result = await session.execute(select(Student).where(Student.class_id == class_id))
         students = list(result.scalars().all())

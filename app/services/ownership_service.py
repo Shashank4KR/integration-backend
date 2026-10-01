@@ -33,7 +33,7 @@ async def check_student_ownership(
 ) -> Student:
     """
     Verifies student resource access:
-    - ADMIN / ACCOUNTANT / LIBRARIAN / WARDEN: Allowed across school.
+    - ADMIN / ACCOUNTANT / LIBRARIAN: Allowed across school.
     - STUDENT: Only their own student profile.
     - PARENT: Only linked children (via ParentStudent).
     - TEACHER: Only students in their assigned classes.
@@ -48,7 +48,8 @@ async def check_student_ownership(
         )
 
     role = _user_role(current_user)
-    if role in ("ADMIN", "ACCOUNTANT", "LIBRARIAN", "WARDEN"):
+    if role in ("ADMIN", "ACCOUNTANT", "LIBRARIAN"):
+
         return student
 
     if role == "STUDENT":
