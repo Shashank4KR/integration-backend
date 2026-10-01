@@ -17,6 +17,7 @@ from app.services.transport_service import (
     bus_service, driver_service, route_service, student_transport_service,
     transport_summary,
 )
+from app.services.ownership_service import check_student_ownership
 
 
 def _ensure_admin(current_user: User) -> None:
@@ -36,10 +37,10 @@ async def create_bus(payload: BusCreate, session: AsyncSession = Depends(get_db)
     return await bus_service.create(session, payload.model_dump())
 
 @bus_router.get("")
-async def get_buses(session: AsyncSession = Depends(get_db)): return await bus_service.list(session)
+async def get_buses(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await bus_service.list(session)
 
 @bus_router.get("/{item_id}")
-async def get_bus(item_id: UUID, session: AsyncSession = Depends(get_db)): return await bus_service.get(session, item_id)
+async def get_bus(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await bus_service.get(session, item_id)
 
 @bus_router.put("/{item_id}")
 async def update_bus(item_id: UUID, payload: BusUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -53,10 +54,10 @@ async def delete_bus(item_id: UUID, session: AsyncSession = Depends(get_db), cur
     return {"message": "Deleted successfully"}
 
 @bus_router.get("/{bus_id}/students")
-async def get_bus_students(bus_id: UUID, session: AsyncSession = Depends(get_db)): return await student_transport_service.get_by_bus(session, bus_id)
+async def get_bus_students(bus_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await student_transport_service.get_by_bus(session, bus_id)
 
 @bus_router.get("/{bus_id}/capacity")
-async def get_bus_capacity(bus_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_bus_capacity(bus_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     bus = await bus_service.get_bus(session, bus_id)
     assigned_students = await student_transport_service.repository.count_by_bus(session, bus_id)
     return {"bus_id": str(bus.id), "capacity": bus.capacity, "assigned_students": assigned_students, "available_seats": bus.capacity - assigned_students}
@@ -71,10 +72,10 @@ async def create_route(payload: RouteCreate, session: AsyncSession = Depends(get
     return await route_service.create(session, payload.model_dump())
 
 @route_router.get("")
-async def get_routes(session: AsyncSession = Depends(get_db)): return await route_service.list(session)
+async def get_routes(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await route_service.list(session)
 
 @route_router.get("/{item_id}")
-async def get_route(item_id: UUID, session: AsyncSession = Depends(get_db)): return await route_service.get(session, item_id)
+async def get_route(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await route_service.get(session, item_id)
 
 @route_router.put("/{item_id}")
 async def update_route(item_id: UUID, payload: RouteUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -88,7 +89,7 @@ async def delete_route(item_id: UUID, session: AsyncSession = Depends(get_db), c
     return {"message": "Deleted successfully"}
 
 @route_router.get("/{route_id}/students")
-async def get_route_students(route_id: UUID, session: AsyncSession = Depends(get_db)): return await student_transport_service.get_by_route(session, route_id)
+async def get_route_students(route_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await student_transport_service.get_by_route(session, route_id)
 
 
 student_transport_router = APIRouter()
@@ -100,10 +101,10 @@ async def create_transport(payload: StudentTransportCreate, session: AsyncSessio
     return await student_transport_service.create(session, payload.model_dump())
 
 @student_transport_router.get("")
-async def get_transports(session: AsyncSession = Depends(get_db)): return await student_transport_service.list(session)
+async def get_transports(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await student_transport_service.list(session)
 
 @student_transport_router.get("/{item_id}")
-async def get_transport(item_id: UUID, session: AsyncSession = Depends(get_db)): return await student_transport_service.get(session, item_id)
+async def get_transport(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await student_transport_service.get(session, item_id)
 
 @student_transport_router.put("/{item_id}")
 async def update_transport(item_id: UUID, payload: StudentTransportUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -119,20 +120,22 @@ async def delete_transport(item_id: UUID, session: AsyncSession = Depends(get_db
 
 student_transport_detail_router = APIRouter()
 @student_transport_detail_router.get("/{student_id}/transport")
-async def get_student_transport(student_id: UUID, session: AsyncSession = Depends(get_db)): return await student_transport_service.get_by_student(session, student_id)
+async def get_student_transport(student_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    await check_student_ownership(session, current_user, student_id)
+    return await student_transport_service.get_by_student(session, student_id)
 
 
 transport_router = APIRouter()
 
 
 @transport_router.get("/summary")
-async def transport_summary_endpoint(session: AsyncSession = Depends(get_db)):
+async def transport_summary_endpoint(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     data = await transport_summary(session)
     return success_response(data)
 
 
 @transport_router.get("/overview")
-async def transport_overview(session: AsyncSession = Depends(get_db)):
+async def transport_overview(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     data = await transport_summary(session)
 
     route_distribution = []
@@ -175,13 +178,13 @@ async def transport_overview(session: AsyncSession = Depends(get_db)):
 
 
 @transport_router.get("/vehicles")
-async def get_vehicles(session: AsyncSession = Depends(get_db)):
+async def get_vehicles(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     items = await bus_service.list(session)
     return success_response(items)
 
 
 @transport_router.get("/vehicles/{item_id}")
-async def get_vehicle(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_vehicle(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     item = await bus_service.get(session, item_id)
     return success_response(item)
 
@@ -221,13 +224,13 @@ async def delete_vehicle(
 
 
 @transport_router.get("/routes")
-async def get_transport_routes(session: AsyncSession = Depends(get_db)):
+async def get_transport_routes(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     items = await route_service.list(session)
     return success_response(items)
 
 
 @transport_router.get("/routes/{item_id}")
-async def get_transport_route(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_transport_route(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     item = await route_service.get(session, item_id)
     return success_response(item)
 
@@ -267,13 +270,13 @@ async def delete_transport_route(
 
 
 @transport_router.get("/drivers")
-async def get_drivers(session: AsyncSession = Depends(get_db)):
+async def get_drivers(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     items = await driver_service.list(session)
     return success_response(items)
 
 
 @transport_router.get("/drivers/{item_id}")
-async def get_driver(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_driver(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     item = await driver_service.get(session, item_id)
     return success_response(item)
 
@@ -328,7 +331,7 @@ async def assign_driver(
 
 
 @transport_router.get("/student-transport")
-async def get_student_transport_allocations(session: AsyncSession = Depends(get_db)):
+async def get_student_transport_allocations(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = await session.execute(
         select(StudentTransport).options(
             selectinload(StudentTransport.student),
@@ -376,7 +379,7 @@ async def delete_student_transport_allocation(
 
 
 @transport_router.get("/trips")
-async def get_trips(session: AsyncSession = Depends(get_db)):
+async def get_trips(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     from sqlalchemy.orm import selectinload
 
     result = await session.execute(
