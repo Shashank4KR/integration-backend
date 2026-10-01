@@ -1,6 +1,6 @@
 import logging
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,12 @@ from app.models.user import User
 from app.models.role import Role
 from app.schemas.communication_schema import AnnouncementCreate, AnnouncementResponse, AnnouncementUpdate, MessageCreate, MessageResponse, NotificationCreate, NotificationResponse, NotificationUpdate
 from app.services.communication_service import announcement_service, message_service, notification_service
+from app.services.ownership_service import (
+    check_message_ownership,
+    check_notification_ownership,
+    check_teacher_ownership,
+    check_user_ownership,
+)
 
 announcement_router = APIRouter()
 notification_router = APIRouter()
@@ -202,18 +208,34 @@ async def get_notifications(
         return await notification_service.list(session)
     return await notification_service.get_notifications(session, current_user.id)
 @notification_router.get("/{item_id}", response_model=NotificationResponse)
-async def get_notification(item_id: UUID, session: AsyncSession = Depends(get_db)): return await notification_service.get(session, item_id)
+async def get_notification(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    notif = await notification_service.get(session, item_id)
+    check_notification_ownership(current_user, notif)
+    return notif
+
+
 @notification_router.put("/{item_id}", response_model=NotificationResponse)
 async def update_notification(item_id: UUID, payload: NotificationUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
     return await notification_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+
+
 @notification_router.delete("/{item_id}")
 async def delete_notification(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin(current_user)
+    notif = await notification_service.get(session, item_id)
+    check_notification_ownership(current_user, notif)
     await notification_service.delete(session, item_id)
     return {"message": "Deleted successfully"}
+
+
 @notification_router.patch("/{item_id}/read", response_model=NotificationResponse)
 async def mark_notification_read(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    notif = await notification_service.get(session, item_id)
+    check_notification_ownership(current_user, notif)
     return await notification_service.mark_as_read(session, item_id)
 
 @notification_router.post("/read-all")
@@ -366,15 +388,52 @@ async def get_messages(
     )
     return result.scalars().all()
 @message_router.get("/conversation", response_model=list[MessageResponse])
-async def get_conversation(sender_id: UUID, receiver_id: UUID, session: AsyncSession = Depends(get_db)): return await message_service.get_conversation(session, sender_id, receiver_id)
+async def get_conversation(
+    sender_id: UUID,
+    receiver_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role != "ADMIN" and str(current_user.id) not in (str(sender_id), str(receiver_id)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: you can only view conversations you are part of",
+        )
+    return await message_service.get_conversation(session, sender_id, receiver_id)
+
+
 @message_router.get("/{item_id}", response_model=MessageResponse)
-async def get_message(item_id: UUID, session: AsyncSession = Depends(get_db)): return await message_service.get(session, item_id)
+async def get_message(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    msg = await message_service.get(session, item_id)
+    check_message_ownership(current_user, msg)
+    return msg
+
+
 @message_router.delete("/{item_id}")
-async def delete_message(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def delete_message(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    msg = await message_service.get(session, item_id)
+    check_message_ownership(current_user, msg)
     await message_service.delete(session, item_id)
     return {"message": "Deleted successfully"}
+
+
 @message_router.patch("/{item_id}/read", response_model=MessageResponse)
-async def mark_message_read(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def mark_message_read(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    msg = await message_service.get(session, item_id)
+    check_message_ownership(current_user, msg)
     return await message_service.mark_as_read(session, item_id)
 
 
@@ -388,13 +447,37 @@ async def mark_all_messages_read(
 
 
 user_communication_router = APIRouter()
+
+
 @user_communication_router.get("/{user_id}/notifications", response_model=list[NotificationResponse])
-async def user_notifications(user_id: UUID, session: AsyncSession = Depends(get_db)): return await notification_service.get_notifications(session, user_id)
+async def user_notifications(
+    user_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    check_user_ownership(current_user, user_id)
+    return await notification_service.get_notifications(session, user_id)
+
+
 @user_communication_router.get("/{user_id}/messages", response_model=list[MessageResponse])
-async def user_messages(user_id: UUID, session: AsyncSession = Depends(get_db)): return await message_service.get_user_messages(session, user_id)
+async def user_messages(
+    user_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    check_user_ownership(current_user, user_id)
+    return await message_service.get_user_messages(session, user_id)
 
 
 teacher_communication_router = APIRouter()
+
+
 @teacher_communication_router.get("/teacher/{teacher_id}/messages", response_model=list[MessageResponse])
-async def teacher_messages(teacher_id: UUID, session: AsyncSession = Depends(get_db)):
-    return await message_service.get_user_messages(session, teacher_id)
+async def teacher_messages(
+    teacher_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    teacher = await check_teacher_ownership(session, current_user, teacher_id)
+    target_user_id = teacher.user_id if teacher.user_id else teacher_id
+    return await message_service.get_user_messages(session, target_user_id)
