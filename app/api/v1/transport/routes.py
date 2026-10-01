@@ -119,7 +119,7 @@ async def delete_transport(item_id: UUID, session: AsyncSession = Depends(get_db
 
 
 student_transport_detail_router = APIRouter()
-@student_transport_detail_router.get("/{student_id}/transport")
+@student_transport_detail_router.get("/{student_id}/transport", response_model=StudentTransportResponse)
 async def get_student_transport(student_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     await check_student_ownership(session, current_user, student_id)
     return await student_transport_service.get_by_student(session, student_id)
