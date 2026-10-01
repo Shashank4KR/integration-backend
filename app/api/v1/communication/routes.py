@@ -132,7 +132,7 @@ async def get_announcements(
     )
     return result.scalars().all()
 @announcement_router.get("/{item_id}", response_model=AnnouncementResponse)
-async def get_announcement(item_id: UUID, session: AsyncSession = Depends(get_db)): return await announcement_service.get(session, item_id)
+async def get_announcement(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await announcement_service.get(session, item_id)
 @announcement_router.put("/{item_id}", response_model=AnnouncementResponse)
 async def update_announcement(item_id: UUID, payload: AnnouncementUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
