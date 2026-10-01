@@ -34,12 +34,19 @@ async def create_teacher_subject(
 
 
 @router.get("", response_model=list[TeacherSubjectResponse])
-async def list_teacher_subjects(session: AsyncSession = Depends(get_db)):
+async def list_teacher_subjects(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await teacher_subject_service.list(session)
 
 
 @router.get("/{item_id}", response_model=TeacherSubjectResponse)
-async def get_teacher_subject(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_teacher_subject(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await teacher_subject_service.get(session, item_id)
 
 

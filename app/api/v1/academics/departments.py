@@ -15,7 +15,11 @@ from app.schemas.department_schema import (
 from app.services.department_service import department_service
 
 router = build_crud_router(
-    department_service, DepartmentCreate, DepartmentUpdate, DepartmentResponse
+    department_service,
+    DepartmentCreate,
+    DepartmentUpdate,
+    DepartmentResponse,
+    read_roles=("ADMIN", "TEACHER", "STUDENT", "PARENT"),
 )
 
 

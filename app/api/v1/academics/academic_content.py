@@ -412,7 +412,10 @@ async def upload_chapter_note(
 
 
 @router.get("/chapter-notes/files/{filename}")
-async def download_chapter_note_file(filename: str):
+async def download_chapter_note_file(
+    filename: str,
+    current_user: User = Depends(get_current_user),
+):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
