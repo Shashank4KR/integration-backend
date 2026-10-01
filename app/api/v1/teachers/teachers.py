@@ -22,9 +22,16 @@ from app.models.user import User
 from app.schemas.class_schema import ClassResponse
 from app.schemas.subject_schema import SubjectResponse
 from app.schemas.teacher_schema import TeacherCreate, TeacherResponse, TeacherUpdate
+from app.services.ownership_service import check_teacher_ownership
 from app.services.teacher_service import teacher_service
 
-router = build_crud_router(teacher_service, TeacherCreate, TeacherUpdate, TeacherResponse)
+router = build_crud_router(
+    teacher_service,
+    TeacherCreate,
+    TeacherUpdate,
+    TeacherResponse,
+    get_checker=check_teacher_ownership,
+)
 
 
 def _ensure_admin(current_user: User) -> None:

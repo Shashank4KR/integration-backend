@@ -20,6 +20,7 @@ from app.schemas.exam_schema import (
     ReportCardResponse,
     StudentPerformanceSummary,
 )
+from app.services.ownership_service import check_student_ownership
 from app.services.report_card_service import report_card_service
 from app.services.student_service import student_service
 
@@ -29,6 +30,7 @@ router = build_crud_router(
     StudentUpdate,
     StudentResponse,
     read_roles=("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"),
+    get_checker=check_student_ownership,
 )
 
 
