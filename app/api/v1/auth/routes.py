@@ -71,7 +71,15 @@ async def get_current_user(
 async def register(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> UserCreateResponse:
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can create users",
+        )
+
     email_result = await db.execute(select(User).where(User.email == user_in.email))
     if email_result.scalar_one_or_none() is not None:
         raise HTTPException(
