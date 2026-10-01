@@ -74,9 +74,9 @@ async def create_fee_structure(payload: FeeStructureCreate, session: AsyncSessio
     _ensure_admin_or_accountant(current_user)
     return await fee_structure_service.create(session, payload.model_dump())
 @fee_structure_router.get("", response_model=list[FeeStructureResponse])
-async def list_fee_structures(session: AsyncSession = Depends(get_db)): return await fee_structure_service.list(session)
+async def list_fee_structures(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await fee_structure_service.list(session)
 @fee_structure_router.get("/{item_id}", response_model=FeeStructureResponse)
-async def get_fee_structure(item_id: UUID, session: AsyncSession = Depends(get_db)): return await fee_structure_service.get(session, item_id)
+async def get_fee_structure(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await fee_structure_service.get(session, item_id)
 @fee_structure_router.put("/{item_id}", response_model=FeeStructureResponse)
 async def update_fee_structure(item_id: UUID, payload: FeeStructureUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin_or_accountant(current_user)

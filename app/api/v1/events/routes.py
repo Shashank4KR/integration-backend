@@ -26,22 +26,22 @@ async def create_event(payload: EventCreate, session: AsyncSession = Depends(get
     return await event_service.create_event(session, payload.model_dump())
 
 @event_router.get("", response_model=list[EventResponse])
-async def get_events(session: AsyncSession = Depends(get_db)): return await event_service.get_events(session)
+async def get_events(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await event_service.get_events(session)
 
 @event_router.get("/type/{event_type}", response_model=list[EventResponse])
-async def get_events_by_type(event_type: str, session: AsyncSession = Depends(get_db)): return await event_service.get_by_type(session, event_type)
+async def get_events_by_type(event_type: str, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await event_service.get_by_type(session, event_type)
 
 @event_router.get("/date-range", response_model=list[EventResponse])
-async def get_events_by_date_range(start_date: date, end_date: date, session: AsyncSession = Depends(get_db)): return await event_service.get_by_date_range(session, start_date, end_date)
+async def get_events_by_date_range(start_date: date, end_date: date, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await event_service.get_by_date_range(session, start_date, end_date)
 
 @event_router.get("/upcoming", response_model=list[EventResponse])
-async def get_upcoming_events(session: AsyncSession = Depends(get_db)): return await event_service.get_upcoming(session)
+async def get_upcoming_events(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await event_service.get_upcoming(session)
 
 @event_router.get("/summary")
-async def get_events_summary(session: AsyncSession = Depends(get_db)): return await event_service.get_summary(session)
+async def get_events_summary(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await event_service.get_summary(session)
 
 @event_router.get("/{item_id}", response_model=EventResponse)
-async def get_event(item_id: UUID, session: AsyncSession = Depends(get_db)): return await event_service.get_event(session, item_id)
+async def get_event(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await event_service.get_event(session, item_id)
 
 @event_router.put("/{item_id}", response_model=EventResponse)
 async def update_event(item_id: UUID, payload: EventUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -63,16 +63,16 @@ async def create_calendar_entry(payload: AcademicCalendarCreate, session: AsyncS
     return await academic_calendar_service.create_calendar_entry(session, payload.model_dump())
 
 @academic_calendar_router.get("", response_model=list[AcademicCalendarResponse])
-async def get_calendar_entries(session: AsyncSession = Depends(get_db)): return await academic_calendar_service.get_calendar_entries(session)
+async def get_calendar_entries(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await academic_calendar_service.get_calendar_entries(session)
 
 @academic_calendar_router.get("/month/{year}/{month}", response_model=list[AcademicCalendarResponse])
-async def get_calendar_entries_by_month(year: int, month: int, session: AsyncSession = Depends(get_db)): return await academic_calendar_service.get_by_month(session, year, month)
+async def get_calendar_entries_by_month(year: int, month: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await academic_calendar_service.get_by_month(session, year, month)
 
 @academic_calendar_router.get("/holidays", response_model=list[AcademicCalendarResponse])
-async def get_holidays(session: AsyncSession = Depends(get_db)): return await academic_calendar_service.get_holidays(session)
+async def get_holidays(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await academic_calendar_service.get_holidays(session)
 
 @academic_calendar_router.get("/{item_id}", response_model=AcademicCalendarResponse)
-async def get_calendar_entry(item_id: UUID, session: AsyncSession = Depends(get_db)): return await academic_calendar_service.get_calendar_entry(session, item_id)
+async def get_calendar_entry(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await academic_calendar_service.get_calendar_entry(session, item_id)
 
 @academic_calendar_router.put("/{item_id}", response_model=AcademicCalendarResponse)
 async def update_calendar_entry(item_id: UUID, payload: AcademicCalendarUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):

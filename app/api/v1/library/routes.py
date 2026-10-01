@@ -12,6 +12,7 @@ from app.models.library_model import (
     BookIssueStatus,
 )
 from app.models.user import User
+from app.services.ownership_service import check_student_ownership
 from app.schemas.library_schema import (
     AuthorCreate,
     AuthorResponse,
@@ -78,12 +79,12 @@ async def create_category(
 
 
 @book_category_router.get("", response_model=list[BookCategoryResponse])
-async def get_categories(session: AsyncSession = Depends(get_db)):
+async def get_categories(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await book_category_service.get_categories(session)
 
 
 @book_category_router.get("/{item_id}", response_model=BookCategoryResponse)
-async def get_category(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_category(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await book_category_service.get_category(session, item_id)
 
 
@@ -110,7 +111,7 @@ async def delete_category(
 
 
 @book_category_router.get("/{category_id}/books", response_model=list[BookResponse])
-async def get_category_books(category_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_category_books(category_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await book_service.get_books_by_category(session, category_id)
 
 
@@ -126,12 +127,12 @@ async def create_author(
 
 
 @author_router.get("", response_model=list[AuthorResponse])
-async def get_authors(session: AsyncSession = Depends(get_db)):
+async def get_authors(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await author_service.get_authors(session)
 
 
 @author_router.get("/{item_id}", response_model=AuthorResponse)
-async def get_author(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_author(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await author_service.get_author(session, item_id)
 
 
@@ -169,12 +170,12 @@ async def create_publisher(
 
 
 @publisher_router.get("", response_model=list[PublisherResponse])
-async def get_publishers(session: AsyncSession = Depends(get_db)):
+async def get_publishers(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await publisher_service.get_publishers(session)
 
 
 @publisher_router.get("/{item_id}", response_model=PublisherResponse)
-async def get_publisher(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_publisher(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await publisher_service.get_publisher(session, item_id)
 
 
@@ -214,6 +215,7 @@ async def create_book(
 @book_router.get("", response_model=list[BookResponse])
 async def get_books(
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     search: str | None = Query(None),
@@ -229,7 +231,7 @@ async def get_books(
 
 
 @book_router.get("/{item_id}", response_model=BookResponse)
-async def get_book(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_book(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await book_service.get_book(session, item_id)
 
 
@@ -356,13 +358,7 @@ async def get_student_issues(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name == "STUDENT":
-        from app.models.student_model import Student as StudentModel
-        student = await session.get(StudentModel, student_id)
-        if student and student.user_id != current_user.id:
-            _forbidden("You can only view your own book issues")
-    else:
-        _ensure_admin_or_librarian(current_user)
+    await check_student_ownership(session, current_user, student_id)
     return await book_issue_service.get_by_student(session, student_id)
 
 
@@ -372,13 +368,7 @@ async def get_student_reservations(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name == "STUDENT":
-        from app.models.student_model import Student as StudentModel
-        student = await session.get(StudentModel, student_id)
-        if student and student.user_id != current_user.id:
-            _forbidden("You can only view your own reservations")
-    else:
-        _ensure_admin_or_librarian(current_user)
+    await check_student_ownership(session, current_user, student_id)
     return await book_reservation_service.get_by_student(session, student_id)
 
 
@@ -388,13 +378,7 @@ async def get_student_fines(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name == "STUDENT":
-        from app.models.student_model import Student as StudentModel
-        student = await session.get(StudentModel, student_id)
-        if student and student.user_id != current_user.id:
-            _forbidden("You can only view your own fines")
-    else:
-        _ensure_admin_or_librarian(current_user)
+    await check_student_ownership(session, current_user, student_id)
     return await fine_payment_service.get_by_student(session, student_id)
 
 
@@ -404,20 +388,14 @@ async def get_student_library_dashboard(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name == "STUDENT":
-        from app.models.student_model import Student as StudentModel
-        student = await session.get(StudentModel, student_id)
-        if student and student.user_id != current_user.id:
-            _forbidden("You can only view your own library data")
-    else:
-        _ensure_admin_or_librarian(current_user)
+    await check_student_ownership(session, current_user, student_id)
     await book_issue_service.refresh_overdue(session)
     return await book_issue_service.get_student_dashboard(session, student_id)
 
 
 # ── Library Summary / Analytics ──────────────────────────────────────────────
 @library_router.get("/summary")
-async def library_summary(session: AsyncSession = Depends(get_db)):
+async def library_summary(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     await book_issue_service.refresh_overdue(session)
     total_books = await session.scalar(select(func.coalesce(func.sum(Book.total_copies), 0)))
     available_books = await session.scalar(select(func.coalesce(func.sum(Book.available_copies), 0)))
@@ -447,20 +425,14 @@ async def library_student_analytics(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name == "STUDENT":
-        from app.models.student_model import Student as StudentModel
-        student = await session.get(StudentModel, student_id)
-        if student and student.user_id != current_user.id:
-            _forbidden("You can only view your own analytics")
-    else:
-        _ensure_admin_or_librarian(current_user)
+    await check_student_ownership(session, current_user, student_id)
     await book_issue_service.refresh_overdue(session)
     return await book_issue_service.get_student_dashboard(session, student_id)
 
 
 # ── Library Settings ─────────────────────────────────────────────────────────
 @library_settings_router.get("", response_model=LibrarySettingsResponse)
-async def get_settings(session: AsyncSession = Depends(get_db)):
+async def get_settings(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await library_settings_service.get_settings(session)
 
 

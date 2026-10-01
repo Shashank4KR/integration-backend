@@ -35,12 +35,15 @@ STANDARD_PERMISSIONS = [
     {"id": "perm-reports-view", "name": "View Reports", "description": "Access system-wide analytics, audits, and exportable reports"},
 ]
 
+from app.api.v1.auth.routes import get_current_user
+from app.models.user import User
+
 @role_router.get("", response_model=list[RoleResponse])
-async def list_roles(session: AsyncSession = Depends(get_db)):
+async def list_roles(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = await session.execute(select(Role))
     roles = result.scalars().all()
     return roles
 
 @permission_router.get("", response_model=list[PermissionResponse])
-async def list_permissions():
+async def list_permissions(current_user: User = Depends(get_current_user)):
     return STANDARD_PERMISSIONS

@@ -16,6 +16,7 @@ from app.schemas.exam_schema import (
 )
 from app.schemas.student_schema import StudentResponse
 from app.services.exam_result_service import exam_result_service
+from app.services.ownership_service import check_teacher_ownership
 
 router = APIRouter()
 
@@ -40,12 +41,12 @@ async def create_exam_result(
 
 
 @router.get("", response_model=list[ExamResultResponse])
-async def list_exam_results(session: AsyncSession = Depends(get_db)):
+async def list_exam_results(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await exam_result_service.list(session)
 
 
 @router.get("/{item_id}", response_model=ExamResultResponse)
-async def get_exam_result(item_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_exam_result(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await exam_result_service.get(session, item_id)
 
 
@@ -75,7 +76,9 @@ async def delete_exam_result(
 async def get_teacher_students(
     teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await check_teacher_ownership(session, current_user, teacher_id)
     from app.models.teacher_subject_model import TeacherSubject
     result = await session.execute(
         select(Student)
