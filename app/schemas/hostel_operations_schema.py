@@ -42,11 +42,11 @@ class MessMenuResponse(_Response):
     items: str | None = None
 class MessExpenseCreate(BaseModel): expense_date: date; category: str=Field(min_length=1); description: str|None=None; amount: Decimal=Field(gt=0)
 class MessExpenseResponse(MessExpenseCreate,_Response): pass
-class MessCollectionCreate(BaseModel): student_id: UUID; amount: Decimal=Field(gt=0); collection_date: date; payment_method: str=Field(min_length=1); received_by: UUID|None=None
+class MessCollectionCreate(BaseModel): student_id: UUID|None=None; amount: Decimal=Field(gt=0); collection_date: date; payment_method: str=Field(min_length=1); received_by: UUID|None=None
 class MessCollectionResponse(MessCollectionCreate,_Response): pass
-class MessAttendanceCreate(BaseModel): student_id: UUID; meal_type: str=Field(min_length=1); attendance_date: date; status: MessAttendanceStatus
+class MessAttendanceCreate(BaseModel): student_id: UUID|None=None; meal_type: str=Field(min_length=1); attendance_date: date; status: MessAttendanceStatus
 class MessAttendanceResponse(MessAttendanceCreate,_Response): pass
-class MaintenanceRequestCreate(BaseModel): requested_by: UUID|None=None; room_id: UUID; issue_type: str=Field(min_length=1); description: str=Field(min_length=1); priority: MaintenancePriority=MaintenancePriority.MEDIUM
+class MaintenanceRequestCreate(BaseModel): requested_by: UUID|None=None; room_id: UUID | str; issue_type: str=Field(min_length=1); description: str=Field(min_length=1); priority: MaintenancePriority=MaintenancePriority.MEDIUM
 class MaintenanceRequestResponse(_Response): requested_by: UUID; room_id: UUID; issue_type: str; description: str; priority: MaintenancePriority; status: MaintenanceStatus; requested_on: datetime
 class WorkOrderCreate(BaseModel): request_id: UUID; assigned_to: UUID; scheduled_date: date
 class WorkOrderResponse(_Response): request_id: UUID; assigned_to: UUID; scheduled_date: date; completed_date: date|None; status: WorkOrderStatus
