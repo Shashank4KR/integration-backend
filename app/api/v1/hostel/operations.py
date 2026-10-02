@@ -40,20 +40,22 @@ from app.services.hostel_operations_service import (
 from app.services.ownership_service import check_student_ownership
 
 def _ensure_admin(current_user: User) -> None:
-    if current_user.role.role_name != "ADMIN":
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role not in ("ADMIN", "WARDEN"):
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin users can perform this action",
+            detail="Only admin or warden users can perform this action",
         )
 
 
 def _ensure_admin_or_accountant(current_user: User) -> None:
-    if current_user.role.role_name not in ("ADMIN", "ACCOUNTANT"):
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role not in ("ADMIN", "ACCOUNTANT", "WARDEN"):
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin or accountant users can perform this action",
+            detail="Only admin, accountant, or warden users can perform this action",
         )
 
 
@@ -64,7 +66,7 @@ def crud(prefix, create, response, service, role_check=None):
         if role_check:
             role_check(current_user)
         data = p.model_dump()
-        for field in ("created_by", "received_by", "approved_by", "published_by", "requested_by"):
+        for field in ("created_by", "received_by", "approved_by", "published_by"):
             if field in data and data[field] is None:
                 data[field] = current_user.id
         return await service.create(s, data)
@@ -72,6 +74,7 @@ def crud(prefix, create, response, service, role_check=None):
     async def list_items(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
         return await service.list(s)
     return r
+
 
 
 visitor_router = crud('', HostelVisitorCreate, HostelVisitorResponse, visitor_service, _ensure_admin)
