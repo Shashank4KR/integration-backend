@@ -47,10 +47,10 @@ async def _notify(session, user_id, title, message):
 
 def _ensure_admin(current_user: User) -> None:
     role_name = (current_user.role.role_name if current_user.role else "").upper()
-    if role_name not in ("ADMIN", "WARDEN"):
+    if role_name not in ("ADMIN", "SUPER_ADMIN"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin or warden users can perform this action",
+            detail="Only admin users can perform this action",
         )
 
 

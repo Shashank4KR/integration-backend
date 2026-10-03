@@ -41,21 +41,21 @@ from app.services.ownership_service import check_student_ownership
 
 def _ensure_admin(current_user: User) -> None:
     role = (current_user.role.role_name if current_user.role else "").upper()
-    if role not in ("ADMIN", "WARDEN"):
+    if role not in ("ADMIN", "SUPER_ADMIN"):
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin or warden users can perform this action",
+            detail="Only admin users can perform this action",
         )
 
 
 def _ensure_admin_or_accountant(current_user: User) -> None:
     role = (current_user.role.role_name if current_user.role else "").upper()
-    if role not in ("ADMIN", "ACCOUNTANT", "WARDEN"):
+    if role not in ("ADMIN", "SUPER_ADMIN", "ACCOUNTANT"):
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin, accountant, or warden users can perform this action",
+            detail="Only admin or accountant users can perform this action",
         )
 
 

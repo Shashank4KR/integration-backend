@@ -166,7 +166,7 @@ async def create_notification(
                 "STUDENTS": ["STUDENT"],
                 "PARENTS": ["PARENT"],
                 "TEACHERS": ["TEACHER"],
-                "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"]
+                "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN"]
             }
             role_names = aud_map.get(aud, [])
             if role_names:
@@ -328,9 +328,7 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
             "ACCOUNTANTS": ["ACCOUNTANT"],
             "LIBRARIAN": ["LIBRARIAN"],
             "LIBRARIANS": ["LIBRARIAN"],
-            "WARDEN": ["WARDEN"],
-            "WARDENS": ["WARDEN"],
-            "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"],
+            "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN"],
         }
         
         if role_key in aud_map:
