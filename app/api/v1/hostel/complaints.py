@@ -25,11 +25,24 @@ async def create_complaint(payload: HostelComplaintCreate, session: AsyncSession
 
 @hostel_complaint_router.get("", response_model=list[HostelComplaintResponse])
 async def list_complaints(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_complaint_service.list(session)
 
 @hostel_complaint_router.get("/{item_id}", response_model=HostelComplaintResponse)
 async def get_complaint(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return await hostel_complaint_service.get(session, item_id)
+    complaint = await hostel_complaint_service.get(session, item_id)
+    if not complaint:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found")
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "SUPER_ADMIN"):
+        student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
+        student = student_res.scalar_one_or_none()
+        if not student or student.id != complaint.student_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view this complaint",
+            )
+    return complaint
 
 @hostel_complaint_router.put("/{item_id}", response_model=HostelComplaintResponse)
 async def update_complaint(

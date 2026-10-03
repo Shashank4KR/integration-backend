@@ -24,6 +24,7 @@ async def create_notice(payload: HostelNoticeCreate, session: AsyncSession = Dep
 
 @hostel_notice_router.get("", response_model=list[HostelNoticeResponse])
 async def list_notices(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_notice_service.list(session)
 
 @hostel_notice_router.get("/published", response_model=list[HostelNoticeResponse])
@@ -32,7 +33,13 @@ async def list_published_notices(session: AsyncSession = Depends(get_db), curren
 
 @hostel_notice_router.get("/{item_id}", response_model=HostelNoticeResponse)
 async def get_notice(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return await hostel_notice_service.get(session, item_id)
+    notice = await hostel_notice_service.get(session, item_id)
+    if not notice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notice not found")
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "SUPER_ADMIN") and notice.status != "PUBLISHED":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only published notices can be viewed")
+    return notice
 
 @hostel_notice_router.put("/{item_id}", response_model=HostelNoticeResponse)
 async def update_notice(
@@ -57,4 +64,4 @@ async def delete_notice(
 @hostel_notice_router.patch("/{item_id}/publish", response_model=HostelNoticeResponse)
 async def publish_notice(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
-    return await hostel_notice_service.publish(session, item_id)
+    return await hostel_notice_service.publish(session, item_id)

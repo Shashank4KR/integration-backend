@@ -64,9 +64,11 @@ async def create_block(payload: HostelBlockCreate, session: AsyncSession = Depen
     return result
 @block_router.get("", response_model=list[HostelBlockResponse])
 async def get_blocks(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_block_service.get_blocks(session)
 @block_router.get("/{item_id}", response_model=HostelBlockResponse)
 async def get_block(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_block_service.get_block(session, item_id)
 @block_router.put("/{item_id}", response_model=HostelBlockResponse)
 async def update_block(item_id: UUID, payload: HostelBlockUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -90,9 +92,11 @@ async def create_room(payload: HostelRoomCreate, session: AsyncSession = Depends
     return result
 @room_router.get("", response_model=list[HostelRoomResponse])
 async def get_rooms(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_room_service.get_rooms(session)
 @room_router.get("/{item_id}", response_model=HostelRoomResponse)
 async def get_room(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_room_service.get_room(session, item_id)
 @room_router.put("/{item_id}", response_model=HostelRoomResponse)
 async def update_room(item_id: UUID, payload: HostelRoomUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -116,12 +120,15 @@ async def create_bed(payload: HostelBedCreate, session: AsyncSession = Depends(g
     return result
 @bed_router.get("/available", response_model=list[HostelBedResponse])
 async def get_available_beds(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_bed_service.get_available_beds(session)
 @bed_router.get("", response_model=list[HostelBedResponse])
 async def get_beds(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_bed_service.get_beds(session)
 @bed_router.get("/{item_id}", response_model=HostelBedResponse)
 async def get_bed(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_bed_service.get_bed(session, item_id)
 @bed_router.put("/{item_id}", response_model=HostelBedResponse)
 async def update_bed(item_id: UUID, payload: HostelBedUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -152,7 +159,7 @@ async def create_allocation(payload: HostelAllocationCreate, session: AsyncSessi
 @allocation_router.get("", response_model=list[HostelAllocationResponse])
 async def get_allocations(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     role = (current_user.role.role_name if current_user.role else "").upper()
-    if role == "ADMIN":
+    if role in ("ADMIN", "SUPER_ADMIN"):
         return await hostel_allocation_service.get_allocations(session)
     if role == "STUDENT":
         res = await session.execute(select(Student).where(Student.user_id == current_user.id))
@@ -161,11 +168,17 @@ async def get_allocations(session: AsyncSession = Depends(get_db), current_user:
             alloc = await hostel_allocation_service.get_student_allocation(session, st.id)
             return [alloc] if alloc else []
         return []
-    return []
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Only admin users can list allocations",
+    )
 @allocation_router.get("/{item_id}", response_model=HostelAllocationResponse)
 async def get_allocation(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     alloc = await hostel_allocation_service.get_allocation(session, item_id)
-    if alloc:
+    if not alloc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allocation not found")
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role not in ("ADMIN", "SUPER_ADMIN"):
         await check_student_ownership(session, current_user, alloc.student_id)
     return alloc
 @allocation_router.post("/{allocation_id}/checkout", response_model=HostelAllocationResponse)

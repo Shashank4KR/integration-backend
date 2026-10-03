@@ -59,27 +59,39 @@ def _ensure_admin_or_accountant(current_user: User) -> None:
         )
 
 
-def crud(prefix, create, response, service, role_check=None):
+def crud(prefix, create, response, service, write_role_check=None, read_role_check=None, include_get_by_id=False):
     r = APIRouter()
     @r.post('', response_model=response, status_code=status.HTTP_201_CREATED)
     async def create_item(p: create, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-        if role_check:
-            role_check(current_user)
+        if write_role_check:
+            write_role_check(current_user)
         data = p.model_dump()
         for field in ("created_by", "received_by", "approved_by", "published_by"):
             if field in data and data[field] is None:
                 data[field] = current_user.id
         return await service.create(s, data)
+
     @r.get('', response_model=list[response])
     async def list_items(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+        if read_role_check:
+            read_role_check(current_user)
         return await service.list(s)
+
+    if include_get_by_id:
+        @r.get('/{item_id}', response_model=response)
+        async def get_item(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+            if read_role_check:
+                read_role_check(current_user)
+            return await service.get(s, item_id)
+
     return r
 
 
 
-visitor_router = crud('', HostelVisitorCreate, HostelVisitorResponse, visitor_service, _ensure_admin)
+visitor_router = crud('', HostelVisitorCreate, HostelVisitorResponse, visitor_service, write_role_check=_ensure_admin, read_role_check=_ensure_admin)
 @visitor_router.get('/{item_id}', response_model=HostelVisitorResponse)
 async def visitor_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await visitor_service.get(s, item_id)
 @visitor_router.put('/{item_id}', response_model=HostelVisitorResponse)
 async def visitor_put(item_id: UUID, p: HostelVisitorUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -91,9 +103,9 @@ async def visitor_del(item_id: UUID, s: AsyncSession = Depends(get_db), current_
     await visitor_service.delete(s, item_id)
     return {'message': 'Deleted successfully'}
 
-fee_structure_router = crud('', HostelFeeStructureCreate, HostelFeeStructureResponse, hostel_fee_structure_service, _ensure_admin_or_accountant)
-fee_invoice_router = crud('', HostelFeeInvoiceCreate, HostelFeeInvoiceResponse, hostel_fee_invoice_service, _ensure_admin_or_accountant)
-hostel_payment_router = crud('', HostelPaymentCreate, HostelPaymentResponse, hostel_payment_service, _ensure_admin_or_accountant)
+fee_structure_router = crud('', HostelFeeStructureCreate, HostelFeeStructureResponse, hostel_fee_structure_service, write_role_check=_ensure_admin_or_accountant, read_role_check=_ensure_admin_or_accountant, include_get_by_id=True)
+fee_invoice_router = crud('', HostelFeeInvoiceCreate, HostelFeeInvoiceResponse, hostel_fee_invoice_service, write_role_check=_ensure_admin_or_accountant, read_role_check=_ensure_admin_or_accountant, include_get_by_id=True)
+hostel_payment_router = crud('', HostelPaymentCreate, HostelPaymentResponse, hostel_payment_service, write_role_check=_ensure_admin_or_accountant, read_role_check=_ensure_admin_or_accountant, include_get_by_id=True)
 
 mess_menu_router = APIRouter()
 
@@ -163,19 +175,20 @@ async def delete_mess_menu(
     _ensure_admin(current_user)
     await mess_menu_service.delete(s, item_id)
     return {'message': 'Deleted successfully'}
-mess_expense_router = crud('', MessExpenseCreate, MessExpenseResponse, mess_expense_service, _ensure_admin_or_accountant)
-mess_collection_router = crud('', MessCollectionCreate, MessCollectionResponse, mess_collection_service, _ensure_admin_or_accountant)
-mess_attendance_router = crud('', MessAttendanceCreate, MessAttendanceResponse, mess_attendance_service, _ensure_admin)
-maintenance_router = crud('', MaintenanceRequestCreate, MaintenanceRequestResponse, maintenance_request_service, _ensure_admin)
-work_order_router = crud('', WorkOrderCreate, WorkOrderResponse, work_order_service, _ensure_admin)
+mess_expense_router = crud('', MessExpenseCreate, MessExpenseResponse, mess_expense_service, write_role_check=_ensure_admin_or_accountant, read_role_check=_ensure_admin_or_accountant, include_get_by_id=True)
+mess_collection_router = crud('', MessCollectionCreate, MessCollectionResponse, mess_collection_service, write_role_check=_ensure_admin_or_accountant, read_role_check=_ensure_admin_or_accountant, include_get_by_id=True)
+mess_attendance_router = crud('', MessAttendanceCreate, MessAttendanceResponse, mess_attendance_service, write_role_check=_ensure_admin, read_role_check=_ensure_admin, include_get_by_id=True)
+maintenance_router = crud('', MaintenanceRequestCreate, MaintenanceRequestResponse, maintenance_request_service, write_role_check=_ensure_admin, read_role_check=_ensure_admin, include_get_by_id=True)
+work_order_router = crud('', WorkOrderCreate, WorkOrderResponse, work_order_service, write_role_check=_ensure_admin, read_role_check=_ensure_admin, include_get_by_id=True)
 @work_order_router.post('/{item_id}/complete', response_model=WorkOrderResponse)
 async def complete(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
     return await work_order_service.complete(s, item_id)
 
-hostel_complaint_router = crud('', HostelComplaintCreate, HostelComplaintResponse, hostel_complaint_service, _ensure_admin)
+hostel_complaint_router = crud('', HostelComplaintCreate, HostelComplaintResponse, hostel_complaint_service, write_role_check=_ensure_admin, read_role_check=_ensure_admin)
 @hostel_complaint_router.get('/{item_id}', response_model=HostelComplaintResponse)
 async def complaint_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_complaint_service.get(s, item_id)
 @hostel_complaint_router.put('/{item_id}', response_model=HostelComplaintResponse)
 async def complaint_put(item_id: UUID, p: HostelComplaintUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -192,11 +205,13 @@ async def complaint_resolve(item_id: UUID, p: HostelComplaintUpdate, s: AsyncSes
     return await hostel_complaint_service.resolve(s, item_id, p.model_dump(exclude_unset=True))
 @hostel_complaint_router.get('/summary', response_model=HostelComplaintSummaryResponse)
 async def complaint_summary(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_complaint_service.list(s)
 
-hostel_notice_router = crud('', HostelNoticeCreate, HostelNoticeResponse, hostel_notice_service, _ensure_admin)
+hostel_notice_router = crud('', HostelNoticeCreate, HostelNoticeResponse, hostel_notice_service, write_role_check=_ensure_admin, read_role_check=_ensure_admin)
 @hostel_notice_router.get('/{item_id}', response_model=HostelNoticeResponse)
 async def notice_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_notice_service.get(s, item_id)
 @hostel_notice_router.put('/{item_id}', response_model=HostelNoticeResponse)
 async def notice_put(item_id: UUID, p: HostelNoticeUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -215,9 +230,10 @@ async def notice_publish(item_id: UUID, s: AsyncSession = Depends(get_db), curre
 async def published_notices(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await hostel_notice_service.list_published(s)
 
-hostel_setting_router = crud('', HostelSettingCreate, HostelSettingResponse, hostel_setting_service, _ensure_admin)
+hostel_setting_router = crud('', HostelSettingCreate, HostelSettingResponse, hostel_setting_service, write_role_check=_ensure_admin, read_role_check=_ensure_admin)
 @hostel_setting_router.get('/{item_id}', response_model=HostelSettingResponse)
 async def setting_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_setting_service.get(s, item_id)
 @hostel_setting_router.put('/{item_id}', response_model=HostelSettingResponse)
 async def setting_put(item_id: UUID, p: HostelSettingUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -229,9 +245,10 @@ async def setting_del(item_id: UUID, s: AsyncSession = Depends(get_db), current_
     await hostel_setting_service.delete(s, item_id)
     return {'message': 'Deleted successfully'}
 
-hostel_leave_router = crud('', HostelLeaveRequestCreate, HostelLeaveRequestResponse, hostel_leave_request_service, _ensure_admin)
+hostel_leave_router = crud('', HostelLeaveRequestCreate, HostelLeaveRequestResponse, hostel_leave_request_service, write_role_check=_ensure_admin, read_role_check=_ensure_admin)
 @hostel_leave_router.get('/{item_id}', response_model=HostelLeaveRequestResponse)
 async def leave_get(item_id: UUID, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_leave_request_service.get(s, item_id)
 @hostel_leave_router.put('/{item_id}', response_model=HostelLeaveRequestResponse)
 async def leave_put(item_id: UUID, p: HostelLeaveRequestUpdate, s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -284,6 +301,7 @@ async def student_notices(student_id: UUID, s: AsyncSession = Depends(get_db), c
 hostel_extra_router = APIRouter()
 @hostel_extra_router.get('/fee-summary')
 async def fee_summary(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin_or_accountant(current_user)
     return {
         'total_invoiced': await s.scalar(select(func.coalesce(func.sum(HostelFeeInvoice.amount), 0))) or 0,
         'total_collected': await s.scalar(select(func.coalesce(func.sum(HostelPayment.amount_paid), 0))) or 0,
@@ -308,6 +326,7 @@ async def maintenance_dashboard(s: AsyncSession = Depends(get_db), current_user:
     }
 @hostel_extra_router.get('/complaint-summary')
 async def complaint_summary(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     items = await hostel_complaint_service.list(s)
     return HostelComplaintSummaryResponse(
         total_open=sum(1 for i in items if i.resolution_status == 'OPEN'),
@@ -317,9 +336,10 @@ async def complaint_summary(s: AsyncSession = Depends(get_db), current_user: Use
     )
 @hostel_extra_router.get('/leave-summary')
 async def leave_summary(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     items = await hostel_leave_request_service.list(s)
     return HostelLeaveSummaryResponse(
         total_pending=sum(1 for i in items if i.approval_status == 'PENDING'),
         total_approved=sum(1 for i in items if i.approval_status == 'APPROVED'),
         total_rejected=sum(1 for i in items if i.approval_status == 'REJECTED'),
-    )
+    )

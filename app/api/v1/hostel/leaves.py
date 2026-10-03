@@ -25,11 +25,24 @@ async def create_leave_request(payload: HostelLeaveRequestCreate, session: Async
 
 @hostel_leave_router.get("", response_model=list[HostelLeaveRequestResponse])
 async def list_leave_requests(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_leave_request_service.list(session)
 
 @hostel_leave_router.get("/{item_id}", response_model=HostelLeaveRequestResponse)
 async def get_leave_request(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return await hostel_leave_request_service.get(session, item_id)
+    leave = await hostel_leave_request_service.get(session, item_id)
+    if not leave:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Leave request not found")
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "SUPER_ADMIN"):
+        student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
+        student = student_res.scalar_one_or_none()
+        if not student or student.id != leave.student_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to view this leave request",
+            )
+    return leave
 
 @hostel_leave_router.put("/{item_id}", response_model=HostelLeaveRequestResponse)
 async def update_leave_request(
@@ -85,4 +98,4 @@ async def student_leave_requests(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to view these leave requests",
             )
-    return await hostel_leave_request_service.repository.get_by_field(session, "student_id", student_id)
+    return await hostel_leave_request_service.repository.get_by_field(session, "student_id", student_id)

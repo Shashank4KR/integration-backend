@@ -24,10 +24,12 @@ async def create_setting(payload: HostelSettingCreate, session: AsyncSession = D
 
 @hostel_setting_router.get("", response_model=list[HostelSettingResponse])
 async def list_settings(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_setting_service.list(session)
 
 @hostel_setting_router.get("/{item_id}", response_model=HostelSettingResponse)
 async def get_setting(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await hostel_setting_service.get(session, item_id)
 
 @hostel_setting_router.put("/{item_id}", response_model=HostelSettingResponse)
@@ -48,4 +50,4 @@ async def delete_setting(
 ):
     _ensure_admin(current_user)
     await hostel_setting_service.delete(session, item_id)
-    return {"message": "Deleted successfully"}
+    return {"message": "Deleted successfully"}
