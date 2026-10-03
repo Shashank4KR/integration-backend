@@ -66,6 +66,8 @@ def crud(prefix, create, response, service, write_role_check=None, read_role_che
         if write_role_check:
             write_role_check(current_user)
         data = p.model_dump()
+        if "requested_by_user_id" in data or create == MaintenanceRequestCreate:
+            data["requested_by_user_id"] = current_user.id
         for field in ("created_by", "received_by", "approved_by", "published_by"):
             if field in data and data[field] is None:
                 data[field] = current_user.id

@@ -46,8 +46,23 @@ class MessCollectionCreate(BaseModel): student_id: UUID|None=None; amount: Decim
 class MessCollectionResponse(MessCollectionCreate,_Response): pass
 class MessAttendanceCreate(BaseModel): student_id: UUID|None=None; meal_type: str=Field(min_length=1); attendance_date: date; status: MessAttendanceStatus
 class MessAttendanceResponse(MessAttendanceCreate,_Response): pass
-class MaintenanceRequestCreate(BaseModel): requested_by: UUID|None=None; room_id: UUID | str; issue_type: str=Field(min_length=1); description: str=Field(min_length=1); priority: MaintenancePriority=MaintenancePriority.MEDIUM
-class MaintenanceRequestResponse(_Response): requested_by: UUID; room_id: UUID; issue_type: str; description: str; priority: MaintenancePriority; status: MaintenanceStatus; requested_on: datetime
+class MaintenanceRequestCreate(BaseModel):
+    requested_by: UUID | None = None
+    requested_by_user_id: UUID | None = None
+    room_id: UUID | str
+    issue_type: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+    priority: MaintenancePriority = MaintenancePriority.MEDIUM
+
+class MaintenanceRequestResponse(_Response):
+    requested_by: UUID | None = None
+    requested_by_user_id: UUID | None = None
+    room_id: UUID
+    issue_type: str
+    description: str
+    priority: MaintenancePriority
+    status: MaintenanceStatus
+    requested_on: datetime
 class WorkOrderCreate(BaseModel): request_id: UUID; assigned_to: UUID; scheduled_date: date
 class WorkOrderResponse(_Response): request_id: UUID; assigned_to: UUID; scheduled_date: date; completed_date: date|None; status: WorkOrderStatus
 class HostelComplaintCreate(BaseModel): student_id: UUID; category: str=Field(min_length=1); description: str=Field(min_length=1); assigned_to: UUID|None=None

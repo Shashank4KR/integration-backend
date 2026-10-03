@@ -45,6 +45,22 @@ async def test_401_unauthenticated_requests(async_client: AsyncClient):
     resp = await async_client.get(f"/students/{uuid.uuid4()}")
     assert resp.status_code == 401
 
+    # Mess, maintenance, work orders, dashboards return 401 unauthenticated
+    for path in (
+        "/mess-menu",
+        "/mess-expenses",
+        "/mess-collections",
+        "/mess-attendance",
+        "/maintenance-requests",
+        "/work-orders",
+        "/hostel/dashboard",
+        "/hostel/mess/dashboard",
+        "/hostel/maintenance/dashboard",
+        "/hostel/dashboard/stats",
+    ):
+        resp = await async_client.get(path)
+        assert resp.status_code == 401, f"{path} did not return 401 unauthenticated"
+
     # Truly public endpoints must return 200 without authentication
     health_resp = await async_client.get("/health")
     assert health_resp.status_code == 200
@@ -128,6 +144,38 @@ async def test_403_role_and_ownership_restrictions(
     app.dependency_overrides[get_current_user] = lambda: user_t
     resp = await async_client.get(f"/teachers/teacher/{other_teacher.id}/messages")
     assert resp.status_code == 403
+
+    # 8. Test STUDENT accessing restricted mess, maintenance, work-orders, and hostel dashboard endpoints -> 403
+    app.dependency_overrides[get_current_user] = lambda: user_a
+    for path in (
+        "/mess-expenses",
+        "/mess-collections",
+        "/mess-attendance",
+        "/maintenance-requests",
+        "/work-orders",
+        "/hostel/dashboard",
+        "/hostel/mess/dashboard",
+        "/hostel/maintenance/dashboard",
+        "/hostel/dashboard/stats",
+    ):
+        resp = await async_client.get(path)
+        assert resp.status_code == 403, f"STUDENT {path} did not return 403, got {resp.status_code}"
+
+    # 9. Test PARENT accessing restricted mess, maintenance, work-orders, and hostel dashboard endpoints -> 403
+    app.dependency_overrides[get_current_user] = lambda: user_p
+    for path in (
+        "/mess-expenses",
+        "/mess-collections",
+        "/mess-attendance",
+        "/maintenance-requests",
+        "/work-orders",
+        "/hostel/dashboard",
+        "/hostel/mess/dashboard",
+        "/hostel/maintenance/dashboard",
+        "/hostel/dashboard/stats",
+    ):
+        resp = await async_client.get(path)
+        assert resp.status_code == 403, f"PARENT {path} did not return 403, got {resp.status_code}"
 
 
 @pytest.mark.asyncio
@@ -216,3 +264,77 @@ async def test_200_authorized_role_and_ownership(
     resp = await async_client.get(f"/students/{student.id}")
     assert resp.status_code == 200
     assert resp.json()["id"] == str(student.id)
+
+    # 7. Admin accessing mess, maintenance, work-order, and dashboard endpoints -> 200
+    for path in (
+        "/mess-menu",
+        "/mess-expenses",
+        "/mess-collections",
+        "/mess-attendance",
+        "/maintenance-requests",
+        "/work-orders",
+        "/hostel/dashboard",
+        "/hostel/mess/dashboard",
+        "/hostel/maintenance/dashboard",
+        "/hostel/dashboard/stats",
+    ):
+        resp = await async_client.get(path)
+        assert resp.status_code == 200, f"ADMIN {path} did not return 200, got {resp.status_code}: {resp.text}"
+
+    # 8. Student and Parent accessing mess-menu -> 200
+    app.dependency_overrides[get_current_user] = lambda: student_user
+    resp = await async_client.get("/mess-menu")
+    assert resp.status_code == 200, f"STUDENT /mess-menu did not return 200, got {resp.status_code}"
+
+    app.dependency_overrides[get_current_user] = lambda: parent_user
+    resp = await async_client.get("/mess-menu")
+    assert resp.status_code == 200, f"PARENT /mess-menu did not return 200, got {resp.status_code}"
+
+
+@pytest.mark.asyncio
+async def test_maintenance_request_requested_by_user_id_enforcement(
+    async_client: AsyncClient, db_session: AsyncSession
+):
+    """
+    Verifies that:
+    1. Server always sets requested_by_user_id = current_user.id, ignoring client-supplied value.
+    2. requested_by is nullable, and there is NO fallback to first student.
+    3. CHECK constraint requires at least requested_by or requested_by_user_id.
+    """
+    from app.models.hostel_model import HostelBlock, HostelRoom
+    admin_role = Role(role_name="ADMIN", description="Administrator")
+    db_session.add(admin_role)
+    await db_session.flush()
+
+    admin_user = User(username="maint_admin", email="maint_adm@example.com", password_hash="hash", role_id=admin_role.id)
+    spoofed_user = User(username="spoofed_user", email="spoofed@example.com", password_hash="hash", role_id=admin_role.id)
+    db_session.add_all([admin_user, spoofed_user])
+    await db_session.flush()
+    admin_user.role = admin_role
+
+    block = HostelBlock(block_name="Block A", block_type="BOYS", total_floors=2, total_rooms=10)
+    db_session.add(block)
+    await db_session.flush()
+
+    room = HostelRoom(block_id=block.id, room_no="101", floor_no=1, capacity=2)
+    db_session.add(room)
+    await db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+
+    # Client tries to pass a spoofed requested_by_user_id
+    payload = {
+        "room_id": str(room.id),
+        "issue_type": "Electrical",
+        "description": "Fan not working",
+        "priority": "HIGH",
+        "requested_by_user_id": str(spoofed_user.id),
+    }
+    resp = await async_client.post("/maintenance-requests", json=payload)
+    assert resp.status_code == 201, f"Expected 201, got {resp.status_code}: {resp.text}"
+    data = resp.json()
+
+    # Verify server ignored client-supplied requested_by_user_id and set current_user.id
+    assert data["requested_by_user_id"] == str(admin_user.id)
+    # Verify requested_by is None (no fallback to a random student)
+    assert data["requested_by"] is None

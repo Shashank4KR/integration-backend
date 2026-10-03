@@ -147,11 +147,10 @@ class MaintenanceRequestService(CRUDService):
   if not target_student_id:
    alloc=await s.scalar(select(HostelAllocation).join(HostelBed, HostelBed.id==HostelAllocation.bed_id).where(HostelBed.room_id==target_room_id,HostelAllocation.status==HostelAllocationStatus.ACTIVE))
    if alloc: target_student_id=alloc.student_id
-   else:
-    first_st=await s.scalar(select(Student).limit(1))
-    if first_st: target_student_id=first_st.id
-    else: bad('At least one student must exist to link maintenance request')
   d['requested_by']=target_student_id
+
+  if not d.get('requested_by') and not d.get('requested_by_user_id'):
+   bad('Either student or user requester must be specified')
 
   p=str(d.get('priority','MEDIUM')).upper()
   if p=='EMERGENCY': p='URGENT'
@@ -231,7 +230,7 @@ mess_menu_service=CRUDService(mess_menu_repository,'Mess menu',unique_constraint
 mess_expense_service=MessExpenseService(mess_expense_repository,'Mess expense')
 mess_collection_service=MessCollectionService(mess_collection_repository,'Mess collection',foreign_keys={'student_id':Student,'received_by':User})
 mess_attendance_service=MessAttendanceService(mess_attendance_repository,'Mess attendance',unique_constraints=(('student_id','meal_type','attendance_date'),),foreign_keys={'student_id':Student})
-maintenance_request_service=MaintenanceRequestService(maintenance_request_repository,'Maintenance request',foreign_keys={'requested_by':Student,'room_id':HostelRoom})
+maintenance_request_service=MaintenanceRequestService(maintenance_request_repository,'Maintenance request',foreign_keys={'requested_by':Student,'requested_by_user_id':User,'room_id':HostelRoom})
 work_order_service=WorkOrderService(work_order_repository,'Work order')
 hostel_complaint_service=HostelComplaintService(hostel_complaint_repository,'Hostel complaint',foreign_keys={'student_id':Student,'assigned_to':User,'resolved_by':User})
 hostel_notice_service=HostelNoticeService(hostel_notice_repository,'Hostel notice',foreign_keys={'published_by':User})
