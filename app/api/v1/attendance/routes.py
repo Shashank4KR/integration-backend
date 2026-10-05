@@ -1,3 +1,4 @@
+import json
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from app.api.v1.auth.routes import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.attendance_model import Attendance
+from app.models.audit_model import AuditLog
 from app.models.parent_model import Parent
 from app.models.parent_student_model import ParentStudent
 from app.models.student_model import Student
@@ -16,6 +18,7 @@ from app.models.teacher_model import Teacher
 from app.models.teacher_subject_model import TeacherSubject
 from app.models.user import User
 from app.schemas.attendance_schema import (
+    AttendanceAuditOverride,
     AttendanceCreate,
     AttendanceResponse,
     AttendanceUpdate,
@@ -37,6 +40,15 @@ def _ensure_teacher_only(current_user: User) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only teacher users can perform this action",
+        )
+
+
+def _ensure_admin_only(current_user: User) -> None:
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "SUPER_ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required for audit override",
         )
 
 
@@ -427,3 +439,39 @@ async def delete_attendance(
     _check_attendance_correction_window(attendance)
     await attendance_service.delete_attendance(session, attendance_id)
     return {"message": "Deleted successfully"}
+
+
+@router.post("/{attendance_id}/audit-override", response_model=AttendanceResponse)
+async def audit_override_attendance(
+    attendance_id: UUID,
+    payload: AttendanceAuditOverride,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_only(current_user)
+    if len(payload.reason.strip()) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reason must be at least 10 characters long",
+        )
+    attendance = await attendance_service.get_attendance(session, attendance_id)
+    old_status = attendance.status.value if hasattr(attendance.status, "value") else str(attendance.status)
+    new_status = payload.status.value if hasattr(payload.status, "value") else str(payload.status)
+
+    attendance.status = payload.status
+    audit_entry = AuditLog(
+        user_id=current_user.id,
+        activity="ATTENDANCE_AUDIT_OVERRIDE",
+        details=json.dumps({
+            "record_id": str(attendance_id),
+            "old_value": old_status,
+            "new_value": new_status,
+            "admin_id": str(current_user.id),
+            "reason": payload.reason.strip(),
+        }),
+    )
+    session.add(audit_entry)
+    await session.commit()
+    await session.refresh(attendance)
+    return attendance
+
