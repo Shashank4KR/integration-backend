@@ -1,3 +1,4 @@
+import json
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import AsyncGenerator
@@ -5,12 +6,14 @@ import uuid
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.main import app
 from app.models.attendance_model import Attendance, AttendanceStatus
+from app.models.audit_model import AuditLog
 from app.models.class_model import Class
 from app.models.class_subject_model import ClassSubject
 from app.models.exam_model import Exam
@@ -538,8 +541,28 @@ async def test_teacher_only_attendance_and_marks_entry(
     marks_data = resp_create_marks.json()
     marks_id = marks_data["id"]
     assert float(marks_data["marks_obtained"]) == 85.5
+    assert marks_data["entered_by"] == str(teacher_assigned_user.id)
 
-    # Teacher updates marks within correction window -> 200
+    # Different teacher (even if assigned in teacher_subjects) cannot update/delete another teacher's marks
+    ts_other = TeacherSubject(
+        teacher_id=teacher_unassigned.id,
+        class_id=class_1.id,
+        subject_id=subject_1.id,
+    )
+    db_session.add(ts_other)
+    await db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: teacher_unassigned_user
+    resp_diff_t_put = await async_client.put(f"/exam-results/{marks_id}", json={"marks_obtained": 88.0})
+    assert resp_diff_t_put.status_code == 403
+    assert "entered" in resp_diff_t_put.text.lower()
+
+    resp_diff_t_del = await async_client.delete(f"/exam-results/{marks_id}")
+    assert resp_diff_t_del.status_code == 403
+    assert "entered" in resp_diff_t_del.text.lower()
+
+    # Original teacher updates marks within correction window -> 200
+    app.dependency_overrides[get_current_user] = lambda: teacher_assigned_user
     resp_update_marks = await async_client.put(f"/exam-results/{marks_id}", json={"marks_obtained": 92.0})
     assert resp_update_marks.status_code == 200
     assert float(resp_update_marks.json()["marks_obtained"]) == 92.0
@@ -599,3 +622,95 @@ async def test_teacher_only_attendance_and_marks_entry(
 
     app.dependency_overrides[get_current_user] = lambda: admin_user
     assert (await async_client.post("/report-cards/generate", json=gen_payload)).status_code == 200
+
+    # -------------------------------------------------------------
+    # I. Admin audit-override endpoints with mandatory >=10 char reason and audit_logs entry
+    # -------------------------------------------------------------
+    # 1. Attendance audit-override
+    # Teacher cannot audit-override attendance -> 403
+    app.dependency_overrides[get_current_user] = lambda: teacher_assigned_user
+    resp_t_att_override = await async_client.post(
+        f"/attendance/{expired_att.id}/audit-override",
+        json={"status": "LATE", "reason": "Medical note verified by doctor"},
+    )
+    assert resp_t_att_override.status_code == 403
+
+    # Admin with reason < 10 characters -> 400 or 422
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    resp_att_short_reason = await async_client.post(
+        f"/attendance/{expired_att.id}/audit-override",
+        json={"status": "LATE", "reason": "short"},
+    )
+    assert resp_att_short_reason.status_code in (400, 422)
+
+    # Admin with reason >= 10 characters -> 200 (overrides even expired window)
+    resp_att_valid_override = await async_client.post(
+        f"/attendance/{expired_att.id}/audit-override",
+        json={"status": "LATE", "reason": "Principal approved medical leave override"},
+    )
+    assert resp_att_valid_override.status_code == 200
+    assert resp_att_valid_override.json()["status"] == "LATE"
+
+    # Verify audit_logs row created for attendance override
+    audit_att_res = await db_session.execute(
+        select(AuditLog).where(
+            AuditLog.activity == "ATTENDANCE_AUDIT_OVERRIDE",
+            AuditLog.user_id == admin_user.id,
+        )
+    )
+    audit_att_logs = audit_att_res.scalars().all()
+    assert len(audit_att_logs) >= 1
+    latest_att_audit = audit_att_logs[-1]
+    att_details = json.loads(latest_att_audit.details)
+    assert att_details["record_id"] == str(expired_att.id)
+    assert att_details["old_value"] == "PRESENT"
+    assert att_details["new_value"] == "LATE"
+    assert att_details["admin_id"] == str(admin_user.id)
+    assert att_details["reason"] == "Principal approved medical leave override"
+
+    # 2. Exam result audit-override
+    # Teacher cannot audit-override marks -> 403
+    app.dependency_overrides[get_current_user] = lambda: teacher_assigned_user
+    resp_t_marks_override = await async_client.post(
+        f"/exam-results/{marks_id}/audit-override",
+        json={"marks_obtained": 96.0, "reason": "Board re-evaluation approved"},
+    )
+    assert resp_t_marks_override.status_code == 403
+
+    # Admin with reason < 10 characters -> 400 or 422
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    resp_marks_short_reason = await async_client.post(
+        f"/exam-results/{marks_id}/audit-override",
+        json={"marks_obtained": 96.0, "reason": "too short"},
+    )
+    assert resp_marks_short_reason.status_code in (400, 422)
+
+    # Admin with reason >= 10 characters -> 200 (overrides even expired window)
+    resp_marks_valid_override = await async_client.post(
+        f"/exam-results/{marks_id}/audit-override",
+        json={
+            "marks_obtained": 96.0,
+            "remarks": "Re-evaluation mark updated",
+            "reason": "Official re-evaluation committee score update",
+        },
+    )
+    assert resp_marks_valid_override.status_code == 200
+    assert float(resp_marks_valid_override.json()["marks_obtained"]) == 96.0
+
+    # Verify audit_logs row created for exam result override
+    audit_marks_res = await db_session.execute(
+        select(AuditLog).where(
+            AuditLog.activity == "EXAM_RESULT_AUDIT_OVERRIDE",
+            AuditLog.user_id == admin_user.id,
+        )
+    )
+    audit_marks_logs = audit_marks_res.scalars().all()
+    assert len(audit_marks_logs) >= 1
+    latest_marks_audit = audit_marks_logs[-1]
+    marks_details = json.loads(latest_marks_audit.details)
+    assert marks_details["record_id"] == str(marks_id)
+    assert float(marks_details["old_value"]["marks_obtained"]) == 92.0
+    assert float(marks_details["new_value"]["marks_obtained"]) == 96.0
+    assert marks_details["admin_id"] == str(admin_user.id)
+    assert marks_details["reason"] == "Official re-evaluation committee score update"
+
