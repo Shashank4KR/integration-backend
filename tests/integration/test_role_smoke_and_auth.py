@@ -535,13 +535,16 @@ async def test_teacher_only_attendance_and_marks_entry(
     resp_del_att = await async_client.delete(f"/attendance/{attendance_id}")
     assert resp_del_att.status_code == 200
 
-    # Teacher creates marks -> 201
-    resp_create_marks = await async_client.post("/exam-results", json=marks_payload)
+    # Teacher creates marks (with client-supplied entered_by that must be ignored) -> 201
+    spoofed_id = str(uuid.uuid4())
+    marks_payload_with_spoof = {**marks_payload, "entered_by": spoofed_id}
+    resp_create_marks = await async_client.post("/exam-results", json=marks_payload_with_spoof)
     assert resp_create_marks.status_code == 201, f"Expected 201, got {resp_create_marks.status_code}: {resp_create_marks.text}"
     marks_data = resp_create_marks.json()
     marks_id = marks_data["id"]
     assert float(marks_data["marks_obtained"]) == 85.5
     assert marks_data["entered_by"] == str(teacher_assigned_user.id)
+    assert marks_data["entered_by"] != spoofed_id
 
     # Different teacher (even if assigned in teacher_subjects) cannot update/delete another teacher's marks
     ts_other = TeacherSubject(
