@@ -21,6 +21,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
+    ATTENDANCE_CORRECTION_WINDOW_HOURS: int = 24
+    MARKS_CORRECTION_WINDOW_HOURS: int = 72
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

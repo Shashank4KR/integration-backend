@@ -15,8 +15,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _ensure_admin(current_user: User) -> None:
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name != "ADMIN":
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin users can perform this action",
+        )
+
+
 def _ensure_admin_or_teacher(current_user: User) -> None:
-    if current_user.role.role_name not in ("ADMIN", "TEACHER"):
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in ("ADMIN", "TEACHER"):
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -45,6 +56,8 @@ async def list_report_cards(
     return list(result.scalars().all())
 
 
+# Note: /generate is accessible to ADMIN and TEACHER. It only aggregates and reads
+# existing marks (ExamResult) to compute student summaries, and does not create or write student exam marks.
 @router.post("/generate", response_model=ReportCardResponse)
 async def generate_report_card(
     payload: ReportCardGenerate,
@@ -63,7 +76,7 @@ async def publish_exam_results(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_admin_or_teacher(current_user)
+    _ensure_admin(current_user)
     from fastapi import HTTPException
     from sqlalchemy import select
     from app.models.exam_model import Exam

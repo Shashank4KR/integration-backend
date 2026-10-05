@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -6,7 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
+from app.core.config import settings
 from app.core.database import get_db
+from app.models.attendance_model import Attendance
 from app.models.parent_model import Parent
 from app.models.parent_student_model import ParentStudent
 from app.models.student_model import Student
@@ -29,14 +31,36 @@ from app.services.attendance_service import attendance_service
 router = APIRouter()
 
 
+def _ensure_teacher_only(current_user: User) -> None:
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name != "TEACHER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only teacher users can perform this action",
+        )
+
+
 def _ensure_teacher_or_admin(current_user: User) -> None:
     role_name = (current_user.role.role_name if current_user.role else "").upper()
     if role_name not in ("ADMIN", "TEACHER"):
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin or teacher users can perform this action",
         )
+
+
+def _check_attendance_correction_window(attendance: Attendance) -> None:
+    now = datetime.now(timezone.utc)
+    created = attendance.created_at
+    if created is not None:
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        cutoff = created + timedelta(hours=settings.ATTENDANCE_CORRECTION_WINDOW_HOURS)
+        if now > cutoff:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Attendance correction window ({settings.ATTENDANCE_CORRECTION_WINDOW_HOURS} hours) has expired.",
+            )
 
 
 async def _get_current_teacher(session: AsyncSession, current_user: User) -> Teacher | None:
@@ -127,13 +151,15 @@ async def create_attendance(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_teacher_or_admin(current_user)
+    _ensure_teacher_only(current_user)
+    teacher = await _get_current_teacher(session, current_user)
     payload_data = payload.model_dump()
+    payload_data["teacher_id"] = teacher.id
     payload_data["marked_by"] = current_user.id
     await _ensure_teacher_context(
         session,
         current_user,
-        payload_data["teacher_id"],
+        teacher.id,
         payload_data["class_id"],
         payload_data["subject_id"],
     )
@@ -146,13 +172,15 @@ async def create_bulk_attendance(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_teacher_or_admin(current_user)
+    _ensure_teacher_only(current_user)
+    teacher = await _get_current_teacher(session, current_user)
     payload_data = payload.model_dump()
+    payload_data["teacher_id"] = teacher.id
     payload_data["marked_by"] = current_user.id
     await _ensure_teacher_context(
         session,
         current_user,
-        payload_data["teacher_id"],
+        teacher.id,
         payload_data["class_id"],
         payload_data["subject_id"],
     )
@@ -354,15 +382,22 @@ async def update_attendance(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_teacher_or_admin(current_user)
+    _ensure_teacher_only(current_user)
+    teacher = await _get_current_teacher(session, current_user)
     attendance = await attendance_service.get_attendance(session, attendance_id)
+    if attendance.teacher_id != teacher.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only edit attendance records that you created",
+        )
     await _ensure_teacher_context(
         session,
         current_user,
-        attendance.teacher_id,
+        teacher.id,
         attendance.class_id,
         attendance.subject_id,
     )
+    _check_attendance_correction_window(attendance)
     return await attendance_service.update_attendance(
         session, attendance_id, payload.model_dump()
     )
@@ -374,14 +409,21 @@ async def delete_attendance(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _ensure_teacher_or_admin(current_user)
+    _ensure_teacher_only(current_user)
+    teacher = await _get_current_teacher(session, current_user)
     attendance = await attendance_service.get_attendance(session, attendance_id)
+    if attendance.teacher_id != teacher.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete attendance records that you created",
+        )
     await _ensure_teacher_context(
         session,
         current_user,
-        attendance.teacher_id,
+        teacher.id,
         attendance.class_id,
         attendance.subject_id,
     )
+    _check_attendance_correction_window(attendance)
     await attendance_service.delete_attendance(session, attendance_id)
     return {"message": "Deleted successfully"}
