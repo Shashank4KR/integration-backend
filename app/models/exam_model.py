@@ -36,3 +36,12 @@ class Exam(Base):
     report_cards = relationship(
         "ReportCard", back_populates="exam", cascade="all, delete-orphan"
     )
+
+    @property
+    def class_name(self) -> str | None:
+        return self.class_.class_name if self.class_ else None
+
+    @property
+    def section(self) -> str | None:
+        return self.class_.section if self.class_ else None
+

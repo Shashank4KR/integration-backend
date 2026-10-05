@@ -31,11 +31,14 @@ class ExamResponse(BaseModel):
     exam_name: str
     exam_type: str
     class_id: UUID
+    class_name: Optional[str] = None
+    section: Optional[str] = None
     start_date: date
     end_date: date
     max_marks: int
     created_at: datetime
     updated_at: datetime
+
 
 
 class ExamResultCreate(BaseModel):
