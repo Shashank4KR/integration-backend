@@ -22,6 +22,11 @@ class AttendanceUpdate(BaseModel):
     status: AttendanceStatus
 
 
+class AttendanceAuditOverride(BaseModel):
+    status: AttendanceStatus
+    reason: str = Field(..., min_length=10, description="Mandatory audit justification")
+
+
 class AttendanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -61,8 +61,15 @@ class ExamResultResponse(BaseModel):
     marks_obtained: Decimal
     grade: Optional[str] = None
     remarks: Optional[str] = None
+    entered_by: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
+
+
+class ExamResultAuditOverride(BaseModel):
+    marks_obtained: Decimal = Field(..., ge=0)
+    remarks: Optional[str] = None
+    reason: str = Field(..., min_length=10, description="Mandatory audit justification")
 
 
 class ReportCardGenerate(BaseModel):

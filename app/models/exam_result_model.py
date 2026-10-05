@@ -28,6 +28,9 @@ class ExamResult(Base):
     marks_obtained: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     grade: Mapped[str | None] = mapped_column(String(10), nullable=True)
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    entered_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -38,3 +41,4 @@ class ExamResult(Base):
     exam = relationship("Exam", back_populates="results", lazy="selectin")
     student = relationship("Student", back_populates="exam_results", lazy="selectin")
     subject = relationship("Subject", back_populates="exam_results", lazy="selectin")
+    entered_by_user = relationship("User", foreign_keys=[entered_by], lazy="selectin")
