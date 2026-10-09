@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1.api import api_router
 from app.core.config import settings
@@ -36,6 +37,40 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def limit_chapter_note_request_size(request, call_next):
+    if request.method != "POST" or request.url.path.rstrip("/") != "/chapter-notes/upload":
+        return await call_next(request)
+
+    max_request_size = 11 * 1024 * 1024
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > max_request_size:
+                return JSONResponse(status_code=413, content={"detail": "Upload request exceeds the 11 MB limit"})
+        except ValueError:
+            return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > max_request_size:
+            return JSONResponse(status_code=413, content={"detail": "Upload request exceeds the 11 MB limit"})
+        body.extend(chunk)
+
+    request._body = bytes(body)
+    consumed = False
+
+    async def replay_request_body():
+        nonlocal consumed
+        if consumed:
+            return {"type": "http.disconnect"}
+        consumed = True
+        return {"type": "http.request", "body": request._body, "more_body": False}
+
+    request._receive = replay_request_body
+    return await call_next(request)
 
 
 @app.middleware("http")

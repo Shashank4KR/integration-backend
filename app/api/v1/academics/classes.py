@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import Depends, status
+from fastapi import Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +8,7 @@ from app.api.v1.auth.routes import get_current_user
 from app.api.v1.router_factory import build_crud_router
 from app.core.database import get_db
 from app.models.class_subject_model import ClassSubject
+from app.models.class_model import Class
 from app.models.exam_model import Exam
 from app.models.exam_result_model import ExamResult
 from app.models.subject_model import Subject
@@ -104,6 +105,38 @@ async def get_class_students(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name != "ADMIN":
+        from app.models.parent_model import Parent
+        from app.models.parent_student_model import ParentStudent
+        from app.models.teacher_subject_model import TeacherSubject
+
+        if role_name == "STUDENT":
+            access = select(Student.id).where(
+                Student.user_id == current_user.id, Student.class_id == class_id
+            )
+        elif role_name == "PARENT":
+            access = (
+                select(ParentStudent.id)
+                .join(Parent, Parent.id == ParentStudent.parent_id)
+                .join(Student, Student.id == ParentStudent.student_id)
+                .where(Parent.user_id == current_user.id, Student.class_id == class_id)
+            )
+        elif role_name == "TEACHER":
+            teacher = await session.execute(select(Teacher.id).where(Teacher.user_id == current_user.id))
+            teacher_id = teacher.scalar_one_or_none()
+            if not teacher_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Class access denied")
+            access = select(TeacherSubject.id).where(
+                TeacherSubject.teacher_id == teacher_id, TeacherSubject.class_id == class_id
+            )
+            access = access.union(select(Teacher.id).join(Class, Class.class_teacher_id == Teacher.id).where(
+                Teacher.id == teacher_id, Class.id == class_id
+            ))
+        else:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Class access denied")
+        if not (await session.execute(access.limit(1))).first():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Class access denied")
     result = await session.execute(select(Student).where(Student.class_id == class_id))
     return result.scalars().all()
 
