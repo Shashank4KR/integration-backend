@@ -38,16 +38,20 @@ def _format_validation_errors(exc: RequestValidationError) -> list[str]:
 
 
 def _error_response(request: Request, status_code: int, message: str, errors: list[str] | None = None) -> JSONResponse:
+    payload = jsonable_encoder(
+        APIResponse(
+            success=False,
+            data=None,
+            message=message,
+            errors=errors,
+        )
+    )
+    # Keep the envelope for clients that use it while exposing FastAPI's
+    # conventional `detail` field for existing frontend service clients.
+    payload["detail"] = message
     return JSONResponse(
         status_code=status_code,
-        content=jsonable_encoder(
-            APIResponse(
-                success=False,
-                data=None,
-                message=message,
-                errors=errors,
-            )
-        ),
+        content=payload,
         headers={"X-Error": message},
     )
 
