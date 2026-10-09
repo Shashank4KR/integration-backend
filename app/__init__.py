@@ -1,0 +1,1 @@
+"""EdTech Backend Application Package."""
