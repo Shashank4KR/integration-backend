@@ -17,7 +17,11 @@ from app.schemas.timetable_schema import (
 from app.services.timetable_service import timetable_service
 
 router = build_crud_router(
-    timetable_service, TimetableCreate, TimetableUpdate, TimetableResponse
+    timetable_service,
+    TimetableCreate,
+    TimetableUpdate,
+    TimetableResponse,
+    read_roles=("ADMIN", "TEACHER", "STUDENT", "PARENT"),
 )
 
 
@@ -66,6 +70,7 @@ async def delete_timetable(
 async def get_teacher_timetable(
     teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     result = await session.execute(
         select(Timetable).where(Timetable.teacher_id == teacher_id)

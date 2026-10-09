@@ -85,8 +85,17 @@ class HostelAllocationResponse(HostelAllocationCreate):
     status: HostelAllocationStatus
     created_at: datetime
     updated_at: datetime
+    bed_no: str | None = None
+    room_no: str | None = None
+    block_name: str | None = None
+    floor_no: int | None = None
 
 
 class HostelTransferRequest(BaseModel):
     bed_id: UUID
     check_in_date: date
+
+
+class HostelCheckoutRequest(BaseModel):
+    checkout_date: date
+

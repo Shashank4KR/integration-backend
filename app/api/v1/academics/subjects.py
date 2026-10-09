@@ -13,7 +13,13 @@ from app.schemas.exam_schema import ExamResultResponse
 from app.schemas.subject_schema import SubjectCreate, SubjectResponse, SubjectUpdate
 from app.services.subject_service import subject_service
 
-router = build_crud_router(subject_service, SubjectCreate, SubjectUpdate, SubjectResponse)
+router = build_crud_router(
+    subject_service,
+    SubjectCreate,
+    SubjectUpdate,
+    SubjectResponse,
+    read_roles=("ADMIN", "TEACHER", "STUDENT", "PARENT"),
+)
 
 
 def _ensure_admin_or_teacher(current_user: User) -> None:
@@ -59,7 +65,9 @@ async def delete_subject(
 
 @router.get("/{subject_id}/exam-results", response_model=list[ExamResultResponse])
 async def get_subject_exam_results(
-    subject_id: UUID, session: AsyncSession = Depends(get_db)
+    subject_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     await subject_service.get(session, subject_id)
     result = await session.execute(

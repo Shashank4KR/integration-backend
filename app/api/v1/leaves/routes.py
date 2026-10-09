@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
@@ -17,6 +17,7 @@ from app.schemas.leave_schema import (
     LeaveTypeUpdate,
 )
 from app.services.leave_service import leave_request_service, leave_type_service
+from app.services.ownership_service import check_leave_ownership, check_user_ownership
 
 leave_type_router = APIRouter()
 leave_request_router = APIRouter()
@@ -24,8 +25,7 @@ user_leave_router = APIRouter()
 
 
 def _ensure_admin(current_user: User) -> None:
-    if current_user.role.role_name != "ADMIN":
-        from fastapi import HTTPException
+    if not current_user.role or current_user.role.role_name != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin users can perform this action",
@@ -33,8 +33,8 @@ def _ensure_admin(current_user: User) -> None:
 
 
 def _ensure_admin_or_teacher(current_user: User) -> None:
-    if current_user.role.role_name not in ("ADMIN", "TEACHER"):
-        from fastapi import HTTPException
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role not in ("ADMIN", "TEACHER"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin or teacher users can perform this action",
@@ -51,12 +51,19 @@ async def create_leave_type(
 
 
 @leave_type_router.get("", response_model=list[LeaveTypeResponse])
-async def get_leave_types(session: AsyncSession = Depends(get_db)):
+async def get_leave_types(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await leave_type_service.get_leave_types(session)
 
 
 @leave_type_router.get("/{leave_type_id}", response_model=LeaveTypeResponse)
-async def get_leave_type(leave_type_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_leave_type(
+    leave_type_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await leave_type_service.get_leave_type(session, leave_type_id)
 
 
@@ -90,25 +97,50 @@ async def apply_leave(
     payload: LeaveRequestCreate, session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await leave_request_service.apply_leave(session, payload.model_dump())
+    data = payload.model_dump()
+    if not data.get("user_id"):
+        data["user_id"] = current_user.id
+    elif str(data.get("user_id")) != str(current_user.id):
+        role = (current_user.role.role_name if current_user.role else "").upper()
+        if role not in ("ADMIN", "PARENT"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You cannot apply for leave on behalf of another user",
+            )
+    return await leave_request_service.apply_leave(session, data)
 
 
 @leave_request_router.get("", response_model=list[LeaveRequestResponse])
-async def get_leaves(session: AsyncSession = Depends(get_db)):
-    return await leave_request_service.get_leaves(session)
+async def get_leaves(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role in ("ADMIN", "TEACHER"):
+        return await leave_request_service.get_leaves(session)
+    return await leave_request_service.get_user_leaves(session, current_user.id)
 
 
 @leave_request_router.get("/pending", response_model=list[LeaveRequestResponse])
-async def get_pending_leaves(session: AsyncSession = Depends(get_db)):
+async def get_pending_leaves(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_teacher(current_user)
     return await leave_request_service.get_pending(session)
 
 
 @leave_request_router.get("/summary", response_model=LeaveSummaryResponse)
-async def get_leave_summary(session: AsyncSession = Depends(get_db)):
+async def get_leave_summary(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_teacher(current_user)
     return await leave_request_service.get_summary(session)
 
 
 @leave_request_router.patch("/{leave_id}/approve", response_model=LeaveRequestResponse)
+@leave_request_router.post("/{leave_id}/approve", response_model=LeaveRequestResponse)
 async def approve_leave(
     leave_id: UUID,
     payload: LeaveApprovalRequest = Body(default=LeaveApprovalRequest()),
@@ -120,6 +152,7 @@ async def approve_leave(
 
 
 @leave_request_router.patch("/{leave_id}/reject", response_model=LeaveRequestResponse)
+@leave_request_router.post("/{leave_id}/reject", response_model=LeaveRequestResponse)
 async def reject_leave(
     leave_id: UUID,
     payload: LeaveApprovalRequest = Body(default=LeaveApprovalRequest()),
@@ -131,15 +164,24 @@ async def reject_leave(
 
 
 @leave_request_router.patch("/{leave_id}/cancel", response_model=LeaveRequestResponse)
+@leave_request_router.post("/{leave_id}/cancel", response_model=LeaveRequestResponse)
 async def cancel_leave(leave_id: UUID, session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    leave = await leave_request_service.get_leave(session, leave_id)
+    check_leave_ownership(current_user, leave)
     return await leave_request_service.cancel_leave(session, leave_id)
 
 
 @leave_request_router.get("/{leave_id}", response_model=LeaveRequestResponse)
-async def get_leave(leave_id: UUID, session: AsyncSession = Depends(get_db)):
-    return await leave_request_service.get_leave(session, leave_id)
+async def get_leave(
+    leave_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    leave = await leave_request_service.get_leave(session, leave_id)
+    check_leave_ownership(current_user, leave)
+    return leave
 
 
 @leave_request_router.put("/{leave_id}", response_model=LeaveRequestResponse)
@@ -170,6 +212,7 @@ async def get_user_leave_requests(
     user_id: UUID, session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name not in ("ADMIN", "TEACHER") and str(current_user.id) != str(user_id):
-        _ensure_admin_or_teacher(current_user)
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role not in ("ADMIN", "TEACHER"):
+        check_user_ownership(current_user, user_id)
     return await leave_request_service.get_user_leaves(session, user_id)

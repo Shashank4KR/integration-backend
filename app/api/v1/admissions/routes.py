@@ -48,12 +48,12 @@ async def create_application(
 
 
 @application_router.get("", response_model=list[AdmissionApplicationResponse])
-async def get_applications(session: AsyncSession = Depends(get_db)):
+async def get_applications(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await admission_application_service.get_applications(session)
 
 
 @application_router.get("/summary", response_model=AdmissionSummaryResponse)
-async def get_admission_summary(session: AsyncSession = Depends(get_db)):
+async def get_admission_summary(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await admission_application_service.get_summary(session)
 
 
@@ -61,7 +61,7 @@ async def get_admission_summary(session: AsyncSession = Depends(get_db)):
     "/status/{status_value}", response_model=list[AdmissionApplicationResponse]
 )
 async def get_applications_by_status(
-    status_value: str, session: AsyncSession = Depends(get_db),
+    status_value: str, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
     return await admission_application_service.get_by_status(session, status_value)
 
@@ -70,7 +70,7 @@ async def get_applications_by_status(
     "/{application_id}/documents", response_model=list[AdmissionDocumentResponse]
 )
 async def get_application_documents(
-    application_id: UUID, session: AsyncSession = Depends(get_db),
+    application_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
     return await admission_document_service.get_by_application(session, application_id)
 
@@ -90,7 +90,7 @@ async def approve_application(
 
 @application_router.get("/{application_id}", response_model=AdmissionApplicationResponse)
 async def get_application(
-    application_id: UUID, session: AsyncSession = Depends(get_db),
+    application_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
     return await admission_application_service.get_application(session, application_id)
 
@@ -132,7 +132,7 @@ async def create_document(
 
 
 @document_router.get("", response_model=list[AdmissionDocumentResponse])
-async def get_documents(session: AsyncSession = Depends(get_db)):
+async def get_documents(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await admission_document_service.get_documents(session)
 
 
@@ -150,7 +150,7 @@ async def verify_document(
 
 
 @document_router.get("/{document_id}", response_model=AdmissionDocumentResponse)
-async def get_document(document_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_document(document_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await admission_document_service.get_document(session, document_id)
 
 

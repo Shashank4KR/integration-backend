@@ -1,7 +1,10 @@
+import logging
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.models.communication_model import Announcement, Message, Notification
@@ -9,6 +12,12 @@ from app.models.user import User
 from app.models.role import Role
 from app.schemas.communication_schema import AnnouncementCreate, AnnouncementResponse, AnnouncementUpdate, MessageCreate, MessageResponse, NotificationCreate, NotificationResponse, NotificationUpdate
 from app.services.communication_service import announcement_service, message_service, notification_service
+from app.services.ownership_service import (
+    check_message_ownership,
+    check_notification_ownership,
+    check_teacher_ownership,
+    check_user_ownership,
+)
 
 announcement_router = APIRouter()
 notification_router = APIRouter()
@@ -23,6 +32,16 @@ def _ensure_admin(current_user: User) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin users can perform this action",
+        )
+
+
+def _ensure_admin_or_teacher(current_user: User) -> None:
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role not in ("ADMIN", "SUPER_ADMIN", "TEACHER", "FACULTY"):
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators and teachers can perform this action",
         )
 
 
@@ -81,21 +100,39 @@ async def get_communication_statistics(
 
 @announcement_router.post("", response_model=AnnouncementResponse, status_code=status.HTTP_201_CREATED)
 async def create_announcement(payload: AnnouncementCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin(current_user)
-    return await announcement_service.create_announcement(session, payload.model_dump())
+    _ensure_admin_or_teacher(current_user)
+    data = payload.model_dump(exclude_unset=True)
+    msg = data.get("message") or data.get("content") or ""
+    if not msg.strip():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Announcement message cannot be empty")
+
+    aud = (data.get("target_audience") or data.get("audience") or "ALL").upper()
+    creator_id = data.get("created_by") or current_user.id
+
+    announcement_dict = {
+        "title": data["title"],
+        "message": msg.strip(),
+        "target_audience": aud,
+        "created_by": creator_id,
+    }
+    return await announcement_service.create_announcement(session, announcement_dict)
+
+
 @announcement_router.get("", response_model=list[AnnouncementResponse])
 async def get_announcements(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name == "ADMIN":
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role in ("ADMIN", "SUPER_ADMIN", "TEACHER", "FACULTY"):
         return await announcement_service.get_announcements(session)
     result = await session.execute(
         select(Announcement).where(Announcement.target_audience.in_(_audiences_for_role(current_user)))
     )
     return result.scalars().all()
 @announcement_router.get("/{item_id}", response_model=AnnouncementResponse)
-async def get_announcement(item_id: UUID, session: AsyncSession = Depends(get_db)): return await announcement_service.get(session, item_id)
+async def get_announcement(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await announcement_service.get(session, item_id)
 @announcement_router.put("/{item_id}", response_model=AnnouncementResponse)
 async def update_announcement(item_id: UUID, payload: AnnouncementUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
@@ -129,7 +166,7 @@ async def create_notification(
                 "STUDENTS": ["STUDENT"],
                 "PARENTS": ["PARENT"],
                 "TEACHERS": ["TEACHER"],
-                "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"]
+                "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN"]
             }
             role_names = aud_map.get(aud, [])
             if role_names:
@@ -171,18 +208,34 @@ async def get_notifications(
         return await notification_service.list(session)
     return await notification_service.get_notifications(session, current_user.id)
 @notification_router.get("/{item_id}", response_model=NotificationResponse)
-async def get_notification(item_id: UUID, session: AsyncSession = Depends(get_db)): return await notification_service.get(session, item_id)
+async def get_notification(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    notif = await notification_service.get(session, item_id)
+    check_notification_ownership(current_user, notif)
+    return notif
+
+
 @notification_router.put("/{item_id}", response_model=NotificationResponse)
 async def update_notification(item_id: UUID, payload: NotificationUpdate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
     return await notification_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+
+
 @notification_router.delete("/{item_id}")
 async def delete_notification(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _ensure_admin(current_user)
+    notif = await notification_service.get(session, item_id)
+    check_notification_ownership(current_user, notif)
     await notification_service.delete(session, item_id)
     return {"message": "Deleted successfully"}
+
+
 @notification_router.patch("/{item_id}/read", response_model=NotificationResponse)
 async def mark_notification_read(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    notif = await notification_service.get(session, item_id)
+    check_notification_ownership(current_user, notif)
     return await notification_service.mark_as_read(session, item_id)
 
 @notification_router.post("/read-all")
@@ -245,8 +298,8 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
             u = await session.get(User, target_uuid)
             if u:
                 target_users.append(u)
-        except ValueError:
-            pass
+        except ValueError as e:
+            logger.debug(f"Target '{clean_target}' is not a valid UUID, falling back to name/email lookup: {e}")
 
     # 2. Try match by username or email
     if not target_users and clean_target:
@@ -275,9 +328,7 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
             "ACCOUNTANTS": ["ACCOUNTANT"],
             "LIBRARIAN": ["LIBRARIAN"],
             "LIBRARIANS": ["LIBRARIAN"],
-            "WARDEN": ["WARDEN"],
-            "WARDENS": ["WARDEN"],
-            "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"],
+            "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN"],
         }
         
         if role_key in aud_map:
@@ -327,31 +378,104 @@ async def get_messages(
     if scope == "all" and current_user.role and current_user.role.role_name == "ADMIN":
         return await message_service.list(session)
     result = await session.execute(
-        select(Message).where(
+        select(Message)
+        .where(
             or_(Message.sender_id == current_user.id, Message.receiver_id == current_user.id)
         )
+        .order_by(Message.sent_on.desc(), Message.created_at.desc())
     )
     return result.scalars().all()
 @message_router.get("/conversation", response_model=list[MessageResponse])
-async def get_conversation(sender_id: UUID, receiver_id: UUID, session: AsyncSession = Depends(get_db)): return await message_service.get_conversation(session, sender_id, receiver_id)
+async def get_conversation(
+    sender_id: UUID,
+    receiver_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role = (current_user.role.role_name if current_user.role else "").upper()
+    if role != "ADMIN" and str(current_user.id) not in (str(sender_id), str(receiver_id)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: you can only view conversations you are part of",
+        )
+    return await message_service.get_conversation(session, sender_id, receiver_id)
+
+
 @message_router.get("/{item_id}", response_model=MessageResponse)
-async def get_message(item_id: UUID, session: AsyncSession = Depends(get_db)): return await message_service.get(session, item_id)
+async def get_message(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    msg = await message_service.get(session, item_id)
+    check_message_ownership(current_user, msg)
+    return msg
+
+
 @message_router.delete("/{item_id}")
-async def delete_message(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def delete_message(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    msg = await message_service.get(session, item_id)
+    check_message_ownership(current_user, msg)
     await message_service.delete(session, item_id)
     return {"message": "Deleted successfully"}
+
+
 @message_router.patch("/{item_id}/read", response_model=MessageResponse)
-async def mark_message_read(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def mark_message_read(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    msg = await message_service.get(session, item_id)
+    check_message_ownership(current_user, msg)
     return await message_service.mark_as_read(session, item_id)
 
+
+@message_router.post("/read-all")
+@message_router.patch("/read-all")
+async def mark_all_messages_read(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await message_service.mark_all_as_read(session, current_user.id)
+
+
 user_communication_router = APIRouter()
+
+
 @user_communication_router.get("/{user_id}/notifications", response_model=list[NotificationResponse])
-async def user_notifications(user_id: UUID, session: AsyncSession = Depends(get_db)): return await notification_service.get_notifications(session, user_id)
+async def user_notifications(
+    user_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    check_user_ownership(current_user, user_id)
+    return await notification_service.get_notifications(session, user_id)
+
+
 @user_communication_router.get("/{user_id}/messages", response_model=list[MessageResponse])
-async def user_messages(user_id: UUID, session: AsyncSession = Depends(get_db)): return await message_service.get_user_messages(session, user_id)
+async def user_messages(
+    user_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    check_user_ownership(current_user, user_id)
+    return await message_service.get_user_messages(session, user_id)
 
 
 teacher_communication_router = APIRouter()
+
+
 @teacher_communication_router.get("/teacher/{teacher_id}/messages", response_model=list[MessageResponse])
-async def teacher_messages(teacher_id: UUID, session: AsyncSession = Depends(get_db)):
-    return await message_service.get_user_messages(session, teacher_id)
+async def teacher_messages(
+    teacher_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    teacher = await check_teacher_ownership(session, current_user, teacher_id)
+    target_user_id = teacher.user_id if teacher.user_id else teacher_id
+    return await message_service.get_user_messages(session, target_user_id)

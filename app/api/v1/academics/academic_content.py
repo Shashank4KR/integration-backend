@@ -1,10 +1,13 @@
+import logging
 import os
 import uuid
 from datetime import date
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+logger = logging.getLogger(__name__)
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +40,52 @@ router = APIRouter()
 
 UPLOAD_DIR = os.path.join(os.getcwd(), "uploads", "notes")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+MAX_NOTE_SIZE = 10 * 1024 * 1024
+
+
+async def _accessible_class_ids(session: AsyncSession, user: User) -> set[UUID] | None:
+    """Return allowed class IDs, None for an administrator, and an empty set for no access."""
+    role_name = (user.role.role_name if user.role else "").upper()
+    if role_name == "ADMIN":
+        return None
+    if role_name == "STUDENT":
+        result = await session.execute(select(Student.class_id).where(Student.user_id == user.id))
+        class_id = result.scalar_one_or_none()
+        return {class_id} if class_id else set()
+    if role_name == "PARENT":
+        result = await session.execute(
+            select(Student.class_id)
+            .join(ParentStudent, ParentStudent.student_id == Student.id)
+            .join(Parent, Parent.id == ParentStudent.parent_id)
+            .where(Parent.user_id == user.id, Student.class_id.is_not(None))
+        )
+        return set(result.scalars().all())
+    if role_name == "TEACHER":
+        teacher_result = await session.execute(select(Teacher.id).where(Teacher.user_id == user.id))
+        teacher_id = teacher_result.scalar_one_or_none()
+        if not teacher_id:
+            return set()
+        assigned = await session.execute(
+            select(TeacherSubject.class_id).where(TeacherSubject.teacher_id == teacher_id)
+        )
+        class_teacher = await session.execute(
+            select(Class.id).where(Class.class_teacher_id == teacher_id)
+        )
+        return set(assigned.scalars().all()) | set(class_teacher.scalars().all())
+    return set()
+
+
+async def _require_class_access(
+    session: AsyncSession, user: User, class_id: UUID, *, teacher_id: UUID | None = None
+) -> UUID | None:
+    allowed = await _accessible_class_ids(session, user)
+    if allowed is not None and class_id not in allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied for this class")
+    if (user.role.role_name if user.role else "").upper() == "TEACHER" and teacher_id is not None:
+        teacher = await session.execute(select(Teacher.id).where(Teacher.user_id == user.id))
+        if teacher.scalar_one_or_none() != teacher_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied for this teacher's record")
+    return allowed
 
 
 async def _get_teacher_for_user(session: AsyncSession, user: User) -> Teacher:
@@ -155,11 +204,19 @@ async def get_lesson_plans(
     stmt = select(LessonPlan, Class, Subject, Teacher).join(Class, Class.id == LessonPlan.class_id).join(Subject, Subject.id == LessonPlan.subject_id).join(Teacher, Teacher.id == LessonPlan.teacher_id)
     
     role_name = current_user.role.role_name.upper() if current_user.role else ""
+    allowed_classes = await _accessible_class_ids(session, current_user)
+    if role_name not in {"ADMIN", "TEACHER", "STUDENT", "PARENT"}:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if allowed_classes is not None:
+        if class_id is not None and class_id not in allowed_classes:
+            raise HTTPException(status_code=403, detail="Access denied for this class")
+        stmt = stmt.where(LessonPlan.class_id.in_(allowed_classes))
     if role_name == "TEACHER":
-        teacher = await session.execute(select(Teacher).where(Teacher.user_id == current_user.id))
-        teacher_obj = teacher.scalar_one_or_none()
-        if teacher_obj:
-            stmt = stmt.where(LessonPlan.teacher_id == teacher_obj.id)
+        teacher_result = await session.execute(select(Teacher.id).where(Teacher.user_id == current_user.id))
+        teacher_id = teacher_result.scalar_one_or_none()
+        if not teacher_id:
+            raise HTTPException(status_code=403, detail="Teacher profile not found")
+        stmt = stmt.where(LessonPlan.teacher_id == teacher_id)
             
     if class_id:
         stmt = stmt.where(LessonPlan.class_id == class_id)
@@ -206,7 +263,20 @@ async def update_lesson_plan(
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson plan not found")
 
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in {"ADMIN", "TEACHER"}:
+        raise HTTPException(status_code=403, detail="Only an assigned teacher or administrator may update lesson plans")
+    await _require_class_access(session, current_user, plan.class_id, teacher_id=plan.teacher_id)
+    updates = payload.model_dump(exclude_unset=True)
+    target_class = updates.get("class_id", plan.class_id)
+    target_subject = updates.get("subject_id", plan.subject_id)
+    if role_name == "TEACHER":
+        teacher = await _ensure_teacher_assigned(session, current_user, target_class, target_subject)
+    else:
+        teacher = None
+    if role_name == "TEACHER" and teacher.id != plan.teacher_id:
+        raise HTTPException(status_code=403, detail="Only the owning teacher may update this lesson plan")
+    for k, v in updates.items():
         setattr(plan, k, v)
     await session.commit()
     await session.refresh(plan)
@@ -242,6 +312,10 @@ async def delete_lesson_plan(
     plan = await session.get(LessonPlan, plan_id)
     if not plan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson plan not found")
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in {"ADMIN", "TEACHER"}:
+        raise HTTPException(status_code=403, detail="Only an assigned teacher or administrator may delete lesson plans")
+    await _require_class_access(session, current_user, plan.class_id, teacher_id=plan.teacher_id)
     await session.delete(plan)
     await session.commit()
     return {"message": "Lesson plan deleted successfully"}
@@ -358,18 +432,46 @@ async def upload_chapter_note(
     chapter_name: str = Form(...),
     title: str = Form(...),
     file: UploadFile = File(...),
+    request: Request = None,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     teacher = await _ensure_teacher_assigned(session, current_user, class_id, subject_id)
+    content_length = request.headers.get("content-length") if request else None
+    if content_length and int(content_length) > MAX_NOTE_SIZE + 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Upload exceeds the 10 MB limit")
+    allowed_extensions = {".pdf", ".png", ".jpg", ".jpeg"}
+    extension = os.path.splitext(file.filename or "")[1].lower()
+    if extension not in allowed_extensions:
+        raise HTTPException(status_code=415, detail="Only PDF, PNG, and JPEG files are allowed")
 
-    ext = os.path.splitext(file.filename)[1] if file.filename else ""
-    stored_filename = f"{uuid.uuid4()}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, stored_filename)
-
-    file_bytes = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(file_bytes)
+    temp_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}.upload")
+    size = 0
+    signature = b""
+    try:
+        with open(temp_path, "wb") as destination:
+            while chunk := await file.read(64 * 1024):
+                size += len(chunk)
+                if size > MAX_NOTE_SIZE:
+                    raise HTTPException(status_code=413, detail="Upload exceeds the 10 MB limit")
+                if len(signature) < 16:
+                    signature += chunk[: 16 - len(signature)]
+                destination.write(chunk)
+        if extension == ".pdf" and signature.startswith(b"%PDF-"):
+            safe_extension, detected_type = ".pdf", "application/pdf"
+        elif extension == ".png" and signature.startswith(b"\x89PNG\r\n\x1a\n"):
+            safe_extension, detected_type = ".png", "image/png"
+        elif extension in {".jpg", ".jpeg"} and signature.startswith(b"\xff\xd8\xff"):
+            safe_extension, detected_type = ".jpg", "image/jpeg"
+        else:
+            raise HTTPException(status_code=415, detail="File content does not match an allowed file type")
+        stored_filename = f"{uuid.uuid4()}{safe_extension}"
+        file_path = os.path.join(UPLOAD_DIR, stored_filename)
+        os.replace(temp_path, file_path)
+    except Exception:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise
 
     file_url = f"/api/chapter-notes/files/{stored_filename}"
 
@@ -381,8 +483,8 @@ async def upload_chapter_note(
         title=title,
         file_url=file_url,
         file_name=file.filename or stored_filename,
-        file_size=len(file_bytes),
-        mime_type=file.content_type,
+        file_size=size,
+        mime_type=detected_type,
     )
     session.add(note)
     await session.commit()
@@ -409,11 +511,30 @@ async def upload_chapter_note(
 
 
 @router.get("/chapter-notes/files/{filename}")
-async def download_chapter_note_file(filename: str):
+async def download_chapter_note_file(
+    filename: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if os.path.basename(filename) != filename or filename in {"", ".", ".."}:
+        raise HTTPException(status_code=404, detail="File not found")
+    note_result = await session.execute(
+        select(ChapterNote).where(ChapterNote.file_url == f"/api/chapter-notes/files/{filename}")
+    )
+    note = note_result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="File not found")
+    await _require_class_access(session, current_user, note.class_id)
     file_path = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-    return FileResponse(file_path)
+    return FileResponse(
+        file_path,
+        media_type="application/octet-stream",
+        filename=os.path.basename(filename),
+        content_disposition_type="attachment",
+        headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox"},
+    )
 
 
 @router.get("/chapter-notes", response_model=List[ChapterNoteResponse])
@@ -427,11 +548,19 @@ async def get_chapter_notes(
     stmt = select(ChapterNote, Class, Subject).join(Class, Class.id == ChapterNote.class_id).join(Subject, Subject.id == ChapterNote.subject_id)
 
     role_name = current_user.role.role_name.upper() if current_user.role else ""
-    if role_name == "STUDENT":
-        student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
-        student = student_res.scalar_one_or_none()
-        if student and student.class_id:
-            stmt = stmt.where(ChapterNote.class_id == student.class_id)
+    allowed_classes = await _accessible_class_ids(session, current_user)
+    if role_name not in {"ADMIN", "TEACHER", "STUDENT", "PARENT"}:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if allowed_classes is not None:
+        if class_id is not None and class_id not in allowed_classes:
+            raise HTTPException(status_code=403, detail="Access denied for this class")
+        stmt = stmt.where(ChapterNote.class_id.in_(allowed_classes))
+    if role_name == "TEACHER":
+        teacher_result = await session.execute(select(Teacher.id).where(Teacher.user_id == current_user.id))
+        teacher_id = teacher_result.scalar_one_or_none()
+        if not teacher_id:
+            raise HTTPException(status_code=403, detail="Teacher profile not found")
+        stmt = stmt.where(ChapterNote.teacher_id == teacher_id)
 
     if class_id:
         stmt = stmt.where(ChapterNote.class_id == class_id)
@@ -474,6 +603,11 @@ async def delete_chapter_note(
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter note not found")
 
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name not in {"ADMIN", "TEACHER"}:
+        raise HTTPException(status_code=403, detail="Only an assigned teacher or administrator may delete notes")
+    await _require_class_access(session, current_user, note.class_id, teacher_id=note.teacher_id)
+
     # If file exists on disk, remove it
     if note.file_url:
         filename = os.path.basename(note.file_url)
@@ -481,8 +615,8 @@ async def delete_chapter_note(
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to remove note file {file_path}: {e}")
 
     await session.delete(note)
     await session.commit()

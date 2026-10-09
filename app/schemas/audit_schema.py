@@ -31,6 +31,13 @@ class AuditLogCreate(BaseModel):
     details: str | None = None
 
 
+class AuditLogUser(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    username: str
+    email: str | None = None
+
+
 class AuditLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
@@ -40,3 +47,5 @@ class AuditLogResponse(BaseModel):
     details: str | None
     created_at: datetime
     updated_at: datetime
+    user: AuditLogUser | None = None
+

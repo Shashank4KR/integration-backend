@@ -24,6 +24,9 @@ class ExamSubject(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     exam = relationship("Exam", backref="exam_subjects_ref", lazy="selectin")
     subject = relationship("Subject", lazy="selectin")
@@ -46,6 +49,9 @@ class ExamInvigilator(Base):
     invigilator_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     exam = relationship("Exam", backref="exam_invigilators_ref", lazy="selectin")
@@ -71,6 +77,9 @@ class ExamTimetable(Base):
     room_no: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     exam = relationship("Exam", backref="exam_timetable_ref", lazy="selectin")

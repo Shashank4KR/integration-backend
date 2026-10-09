@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1.api import api_router
 from app.core.config import settings
@@ -15,9 +16,8 @@ from app.services.auth_service import AuthService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     yield
+
 
 
 app = FastAPI(
@@ -40,12 +40,53 @@ app.add_middleware(
 
 
 @app.middleware("http")
+async def limit_chapter_note_request_size(request, call_next):
+    if request.method != "POST" or request.url.path.rstrip("/") != "/chapter-notes/upload":
+        return await call_next(request)
+
+    max_request_size = 11 * 1024 * 1024
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > max_request_size:
+                return JSONResponse(status_code=413, content={"detail": "Upload request exceeds the 11 MB limit"})
+        except ValueError:
+            return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > max_request_size:
+            return JSONResponse(status_code=413, content={"detail": "Upload request exceeds the 11 MB limit"})
+        body.extend(chunk)
+
+    request._body = bytes(body)
+    consumed = False
+
+    async def replay_request_body():
+        nonlocal consumed
+        if consumed:
+            return {"type": "http.disconnect"}
+        consumed = True
+        return {"type": "http.request", "body": request._body, "more_body": False}
+
+    request._receive = replay_request_body
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def add_security_headers(request, call_next):
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+    )
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' http: https: ws: wss:; frame-ancestors 'none';",
+    )
     return response
 
 
@@ -54,7 +95,7 @@ async def audit_business_actions(request, call_next):
     response = await call_next(request)
     if response.status_code >= 400 or request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
         return response
-    if request.url.path.startswith(("/login", "/logout", "/audit", "/login-history", "/audit-logs")):
+    if request.url.path.startswith(("/login", "/logout", "/audit", "/login-history", "/audit-logs", "/auth/")):
         return response
     authorization = request.headers.get("authorization", "")
     if not authorization.lower().startswith("bearer "):

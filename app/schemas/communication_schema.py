@@ -5,9 +5,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class AnnouncementCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
-    message: str = Field(min_length=1)
-    target_audience: str
-    created_by: UUID
+    message: str | None = None
+    content: str | None = None
+    target_audience: str | None = None
+    audience: str | None = None
+    created_by: UUID | None = None
+    target_class_id: UUID | None = None
+    announcement_type: str | None = None
 
 
 class AnnouncementUpdate(BaseModel):
@@ -16,9 +20,13 @@ class AnnouncementUpdate(BaseModel):
     target_audience: str | None = None
 
 
-class AnnouncementResponse(AnnouncementCreate):
+class AnnouncementResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    title: str
+    message: str
+    target_audience: str
+    created_by: UUID
     created_at: datetime
     updated_at: datetime
 

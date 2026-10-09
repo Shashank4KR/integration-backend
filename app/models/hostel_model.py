@@ -101,3 +101,19 @@ class HostelAllocation(Base):
     student = relationship("Student", back_populates="hostel_allocations", lazy="selectin")
     bed: Mapped[HostelBed] = relationship("HostelBed", back_populates="allocations", lazy="selectin")
     leave_requests: Mapped[list["HostelLeaveRequest"]] = relationship("HostelLeaveRequest", back_populates="allocation", lazy="selectin")
+
+    @property
+    def bed_no(self) -> str | None:
+        return self.bed.bed_no if self.bed else None
+
+    @property
+    def room_no(self) -> str | None:
+        return self.bed.room.room_no if self.bed and self.bed.room else None
+
+    @property
+    def floor_no(self) -> int | None:
+        return self.bed.room.floor_no if self.bed and self.bed.room else None
+
+    @property
+    def block_name(self) -> str | None:
+        return self.bed.room.block.block_name if self.bed and self.bed.room and self.bed.room.block else None

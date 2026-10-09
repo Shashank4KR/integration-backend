@@ -29,6 +29,7 @@ def build_crud_router(
     response_schema: type,
     read_roles: tuple[str, ...] = ("ADMIN",),
     write_roles: tuple[str, ...] = ("ADMIN",),
+    get_checker: Any | None = None,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -55,7 +56,10 @@ def build_crud_router(
         session: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
     ):
-        require_roles(current_user, read_roles)
+        if get_checker is not None:
+            await get_checker(session, current_user, item_id)
+        else:
+            require_roles(current_user, read_roles)
         return await service.get(session, item_id)
 
     @router.put("/{item_id:uuid}", response_model=response_schema)

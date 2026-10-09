@@ -55,7 +55,7 @@ from .admission_model import (
 from .leave_model import LeaveRequest, LeaveStatus, LeaveType
 from .event_model import AcademicCalendar, AcademicCalendarEventType, Event, EventType
 from .library_model import Book, BookCategory, BookIssue, BookIssueStatus
-from .transport_model import Bus, Route, StudentTransport, Driver
+from .transport_model import Bus, Route, RouteStop, StudentTransport, Driver
 from .audit_model import AuditLog, LoginHistory
 from .ai_analytics_model import AIAnalytics, AIChatHistory
 from .hostel_model import HostelAllocation, HostelAllocationStatus, HostelBed, HostelBedStatus, HostelBlock, HostelBlockStatus, HostelRoom, HostelRoomStatus
@@ -83,6 +83,7 @@ from .academic_content_model import (
 )
 from .settings_model import SystemSetting
 from .exam_models import ExamSubject, ExamInvigilator, ExamTimetable
+from .school_model import School
 
 Faculty = Teacher
 StudentParent = ParentStudent

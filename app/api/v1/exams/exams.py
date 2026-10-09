@@ -56,5 +56,5 @@ async def delete_exam(
 
 
 @router.get("/{exam_id}/toppers", response_model=list[ExamTopperResponse])
-async def get_exam_toppers(exam_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_exam_toppers(exam_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await report_card_service.get_toppers(session, exam_id)

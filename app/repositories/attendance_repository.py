@@ -32,8 +32,12 @@ class AttendanceRepository:
         start_date: date | None = None,
         end_date: date | None = None,
         status: str | None = None,
+        academic_year: str | None = None,
     ) -> list[Attendance]:
         stmt = select(Attendance)
+        if academic_year:
+            from app.models.class_model import Class
+            stmt = stmt.join(Class, Class.id == Attendance.class_id).where(Class.academic_year == academic_year)
         if class_id:
             stmt = stmt.where(Attendance.class_id == class_id)
         if student_id:

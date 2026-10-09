@@ -168,6 +168,7 @@ async def get_all_attendance(
     start_date: date | None = Query(None),
     end_date: date | None = Query(None),
     status: str | None = Query(None),
+    academic_year: str | None = Query(None),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -183,6 +184,7 @@ async def get_all_attendance(
         start_date=start_date,
         end_date=end_date,
         status=status,
+        academic_year=academic_year,
     )
 
 

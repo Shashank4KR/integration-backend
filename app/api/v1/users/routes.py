@@ -9,6 +9,7 @@ from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.user import User
+from app.services.ownership_service import check_user_ownership
 from app.services.role_resolver import resolve_role
 from app.schemas.user import (
     UserCreate,
@@ -96,6 +97,17 @@ async def get_users(
 
 
 @router.get(
+    "/users/me",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK
+)
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_user),
+) -> UserResponse:
+    return UserResponse.model_validate(current_user)
+
+
+@router.get(
     "/users/{id}",
     response_model=UserResponse,
     status_code=status.HTTP_200_OK
@@ -105,7 +117,7 @@ async def get_user(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
-    _ensure_admin(current_user)
+    check_user_ownership(current_user, id)
 
     result = await session.execute(select(User).where(User.id == id))
     user = result.scalar_one_or_none()
@@ -130,7 +142,7 @@ async def update_user(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
-    _ensure_admin(current_user)
+    check_user_ownership(current_user, id)
 
     result = await session.execute(select(User).where(User.id == id))
     user = result.scalar_one_or_none()
@@ -142,6 +154,12 @@ async def update_user(
         )
 
     update_data = user_data.model_dump(exclude_unset=True)
+
+    if ("role_id" in update_data or "is_active" in update_data) and (not current_user.role or current_user.role.role_name != "ADMIN"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can modify user role or status",
+        )
 
     if "email" in update_data:
         result = await session.execute(

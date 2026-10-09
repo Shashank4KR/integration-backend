@@ -1,6 +1,9 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+import logging
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -243,8 +246,8 @@ class BookIssueService(CRUDService):
                     "message": f"'{book.title}' has been issued to you. Due date: {data['due_date']}.",
                 })
                 await session.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send book issued notification: {e}")
         return issue
 
     async def update_issue(self, session: AsyncSession, item_id: UUID, data: dict):
@@ -283,8 +286,8 @@ class BookIssueService(CRUDService):
                     "message": f"'{book.title}' has been successfully returned.{fine_msg}",
                 })
                 await session.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send book returned notification: {e}")
         return issue
 
     async def refresh_overdue(self, session: AsyncSession):
@@ -356,8 +359,8 @@ class BookIssueService(CRUDService):
                     "message": f"A fine of ₹{amount} has been paid for '{issue.book.title if hasattr(issue, 'book') else 'a borrowed book'}'.",
                 })
                 await session.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send fine paid notification: {e}")
         return payment
 
     async def get_dashboard_analytics(self, session: AsyncSession) -> dict:
@@ -463,8 +466,8 @@ class BookReservationService(CRUDService):
                     "message": f"Your reservation for '{book.title}' has been submitted and is pending approval.",
                 })
                 await session.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send reservation submitted notification: {e}")
         return reservation
 
     async def _has_active_reservation(self, session: AsyncSession, book_id: UUID, student_id: UUID) -> bool:
@@ -500,8 +503,8 @@ class BookReservationService(CRUDService):
                     "message": f"Your reservation for '{book.title}' has been approved. Please visit the library to collect the book.",
                 })
                 await session.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send reservation approved notification: {e}")
         return reservation
 
     async def reject_reservation(self, session: AsyncSession, reservation_id: UUID, current_user: User):
@@ -524,8 +527,8 @@ class BookReservationService(CRUDService):
                     "message": f"Your reservation for '{book.title}' has been rejected. Please contact the librarian for more information.",
                 })
                 await session.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to send reservation rejected notification: {e}")
         return reservation
 
     async def cancel_reservation(self, session: AsyncSession, reservation_id: UUID, current_user: User):

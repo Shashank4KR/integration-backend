@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import Depends, status
+from fastapi import Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +8,7 @@ from app.api.v1.auth.routes import get_current_user
 from app.api.v1.router_factory import build_crud_router
 from app.core.database import get_db
 from app.models.class_subject_model import ClassSubject
+from app.models.class_model import Class
 from app.models.exam_model import Exam
 from app.models.exam_result_model import ExamResult
 from app.models.subject_model import Subject
@@ -26,7 +27,13 @@ from app.schemas.exam_schema import ExamResultResponse
 from app.schemas.timetable_schema import TimetableResponse
 from app.services.class_service import class_service
 
-router = build_crud_router(class_service, ClassCreate, ClassUpdate, ClassResponse)
+router = build_crud_router(
+    class_service,
+    ClassCreate,
+    ClassUpdate,
+    ClassResponse,
+    read_roles=("ADMIN", "TEACHER", "STUDENT", "PARENT"),
+)
 
 
 def _ensure_admin_or_teacher(current_user: User) -> None:
@@ -71,81 +78,97 @@ async def delete_class(
 
 
 @router.get("/{class_id}/subjects", response_model=list[ClassSubjectSummary])
-async def get_class_subjects(class_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_class_subjects(
+    class_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await class_service.get_class_subjects(session, class_id)
 
 
 @router.get("/{class_id}/teachers", response_model=list[ClassTeacherSummary])
-async def get_class_teachers(class_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_class_teachers(
+    class_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await class_service.get_class_teachers(session, class_id)
 
 
 from app.schemas.student import StudentResponse
 from app.models.student_model import Student
 
+
 @router.get("/{class_id}/students", response_model=list[StudentResponse])
-async def get_class_students(class_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_class_students(
+    class_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_name = (current_user.role.role_name if current_user.role else "").upper()
+    if role_name != "ADMIN":
+        from app.models.parent_model import Parent
+        from app.models.parent_student_model import ParentStudent
+        from app.models.teacher_subject_model import TeacherSubject
+
+        if role_name == "STUDENT":
+            access = select(Student.id).where(
+                Student.user_id == current_user.id, Student.class_id == class_id
+            )
+        elif role_name == "PARENT":
+            access = (
+                select(ParentStudent.id)
+                .join(Parent, Parent.id == ParentStudent.parent_id)
+                .join(Student, Student.id == ParentStudent.student_id)
+                .where(Parent.user_id == current_user.id, Student.class_id == class_id)
+            )
+        elif role_name == "TEACHER":
+            teacher = await session.execute(select(Teacher.id).where(Teacher.user_id == current_user.id))
+            teacher_id = teacher.scalar_one_or_none()
+            if not teacher_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Class access denied")
+            access = select(TeacherSubject.id).where(
+                TeacherSubject.teacher_id == teacher_id, TeacherSubject.class_id == class_id
+            )
+            access = access.union(select(Teacher.id).join(Class, Class.class_teacher_id == Teacher.id).where(
+                Teacher.id == teacher_id, Class.id == class_id
+            ))
+        else:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Class access denied")
+        if not (await session.execute(access.limit(1))).first():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Class access denied")
     result = await session.execute(select(Student).where(Student.class_id == class_id))
     return result.scalars().all()
 
 
-
 @router.get("/{class_id}/timetable", response_model=list[TimetableResponse])
-async def get_class_timetable(class_id: UUID, session: AsyncSession = Depends(get_db)):
+async def get_class_timetable(
+    class_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await class_service.get_class_timetable(session, class_id)
 
 
 @router.get("/{class_id}/exams", response_model=list[ExamResultResponse])
-async def get_class_exams(class_id: UUID, session: AsyncSession = Depends(get_db)):
-    return await class_service.get_class_exams(session, class_id)
-
-
-@router.get("/{class_id}/subjects", response_model=list[ClassSubjectSummary])
-async def get_subjects_for_class(
-    class_id: UUID, session: AsyncSession = Depends(get_db)
+async def get_class_exams(
+    class_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    await class_service.get(session, class_id)
-    result = await session.execute(
-        select(Subject)
-        .join(ClassSubject, ClassSubject.subject_id == Subject.id)
-        .where(ClassSubject.class_id == class_id)
-    )
-    return result.scalars().all()
+    return await class_service.get_class_exams(session, class_id)
 
 
 @router.get("/{class_id}/exam-results", response_model=list[ExamResultResponse])
 async def get_class_exam_results(
-    class_id: UUID, session: AsyncSession = Depends(get_db)
+    class_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     await class_service.get(session, class_id)
     result = await session.execute(
         select(ExamResult)
         .join(Exam, ExamResult.exam_id == Exam.id)
         .where(Exam.class_id == class_id)
-    )
-    return result.scalars().all()
-
-
-@router.get("/{class_id}/teachers", response_model=list[ClassTeacherSummary])
-async def get_teachers_for_class(
-    class_id: UUID, session: AsyncSession = Depends(get_db)
-):
-    await class_service.get(session, class_id)
-    result = await session.execute(
-        select(Teacher)
-        .join(TeacherSubject, TeacherSubject.teacher_id == Teacher.id)
-        .where(TeacherSubject.class_id == class_id)
-        .distinct()
-    )
-    return result.scalars().all()
-
-
-@router.get("/{class_id}/timetable", response_model=list[TimetableResponse])
-async def get_timetable_for_class(
-    class_id: UUID, session: AsyncSession = Depends(get_db)
-):
-    await class_service.get(session, class_id)
-    result = await session.execute(
-        select(Timetable).where(Timetable.class_id == class_id)
     )
     return result.scalars().all()

@@ -153,3 +153,4 @@ class ExamTimetableResponse(BaseModel):
     end_time: time
     room_no: Optional[str] = None
     created_at: datetime
+

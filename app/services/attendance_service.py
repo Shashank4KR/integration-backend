@@ -58,6 +58,7 @@ class AttendanceService:
         start_date: date | None = None,
         end_date: date | None = None,
         status: str | None = None,
+        academic_year: str | None = None,
     ):
         return await attendance_repository.get_all(
             session,
@@ -68,6 +69,7 @@ class AttendanceService:
             start_date=start_date,
             end_date=end_date,
             status=status,
+            academic_year=academic_year,
         )
 
     async def get_student_attendance(self, session: AsyncSession, student_id: UUID):

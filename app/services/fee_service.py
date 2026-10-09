@@ -135,10 +135,20 @@ class FeeInvoiceService(CRUDService):
         await self._set_invoice_status(session, item)
         return item
 
-    async def list(self, session: AsyncSession):
-        items = await super().list(session)
+    async def list(self, session: AsyncSession, status: str | None = None):
+        if status:
+            normalized = status.strip().upper()
+            items = await fee_invoice_repository.get_by_status(session, normalized)
+        else:
+            items = await super().list(session)
         for item in items:
             await self._set_invoice_status(session, item)
+        if status:
+            normalized = status.strip().upper()
+            items = [
+                item for item in items
+                if (item.status.upper() if item.status else "") == normalized
+            ]
         return items
 
     async def _validate_invoice(self, session: AsyncSession, data: dict) -> None:
@@ -154,8 +164,11 @@ class FeeInvoiceService(CRUDService):
             _bad_request("Fee type must exist")
         if data.get("amount") is not None and data["amount"] <= 0:
             _bad_request("amount must be greater than 0")
-        if data.get("status") is not None and data["status"] not in INVOICE_STATUSES:
-            _bad_request("Invalid invoice status")
+        if data.get("status") is not None:
+            if isinstance(data["status"], str):
+                data["status"] = data["status"].strip().upper()
+            if data["status"] not in INVOICE_STATUSES:
+                _bad_request("Invalid invoice status")
 
     async def _calculate_invoice(self, session: AsyncSession, data: dict) -> None:
         if data.get("amount") is None:
@@ -238,6 +251,22 @@ class FeeInvoiceService(CRUDService):
         for item in items:
             await self._set_invoice_status(session, item)
         return items
+
+    async def get_by_student_and_status(
+        self, session: AsyncSession, student_id: UUID, status: str
+    ):
+        if await session.get(Student, student_id) is None:
+            _not_found("Student not found")
+        normalized = status.strip().upper() if status else ""
+        items = await fee_invoice_repository.get_by_student_and_status(
+            session, student_id, normalized
+        )
+        for item in items:
+            await self._set_invoice_status(session, item)
+        return [
+            item for item in items
+            if (item.status.upper() if item.status else "") == normalized
+        ]
 
     async def get_outstanding_by_student(
         self, session: AsyncSession, student_id: UUID

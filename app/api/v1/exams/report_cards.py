@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -9,6 +10,8 @@ from app.models.user import User
 from app.schemas.exam_schema import ReportCardGenerate, ReportCardResponse
 from app.services.report_card_service import report_card_service
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
@@ -19,6 +22,27 @@ def _ensure_admin_or_teacher(current_user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin or teacher users can perform this action",
         )
+
+
+@router.get("", response_model=list[ReportCardResponse])
+async def list_report_cards(
+    class_id: UUID | None = None,
+    exam_id: UUID | None = None,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from sqlalchemy import select
+    from app.models.report_card_model import ReportCard
+    from app.models.student_model import Student
+
+    query = select(ReportCard)
+    if exam_id is not None:
+        query = query.where(ReportCard.exam_id == exam_id)
+    if class_id is not None:
+        query = query.join(Student, Student.id == ReportCard.student_id).where(Student.class_id == class_id)
+
+    result = await session.execute(query)
+    return list(result.scalars().all())
 
 
 @router.post("/generate", response_model=ReportCardResponse)
@@ -63,8 +87,8 @@ async def publish_exam_results(
                 session, student.id, exam_id, remarks="Published exam result"
             )
             generated += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to generate report card for student {student.id} in exam {exam_id}: {e}")
 
     return {"message": f"Successfully published results. Generated {generated} report cards."}
 

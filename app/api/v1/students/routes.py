@@ -20,6 +20,7 @@ from app.schemas.exam_schema import (
     ReportCardResponse,
     StudentPerformanceSummary,
 )
+from app.services.ownership_service import check_student_ownership
 from app.services.report_card_service import report_card_service
 from app.services.student_service import student_service
 
@@ -28,7 +29,8 @@ router = build_crud_router(
     StudentCreate,
     StudentUpdate,
     StudentResponse,
-    read_roles=("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"),
+    read_roles=("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN"),
+    get_checker=check_student_ownership,
 )
 
 
@@ -38,7 +40,7 @@ async def list_students(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_roles(current_user, ("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN", "WARDEN"))
+    require_roles(current_user, ("ADMIN", "TEACHER", "ACCOUNTANT", "LIBRARIAN"))
     if class_id is not None:
         result = await session.execute(select(Student).where(Student.class_id == class_id))
         students = list(result.scalars().all())

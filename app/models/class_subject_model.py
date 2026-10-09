@@ -24,6 +24,9 @@ class ClassSubject(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     class_ = relationship("Class", back_populates="class_subjects", lazy="selectin")
     subject = relationship("Subject", back_populates="class_subjects", lazy="selectin")
