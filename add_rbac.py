@@ -1,6 +1,6 @@
 import os
 
-base = 'C:/Users/iqraf/Downloads/cognora/EdTech_backend/app/api/v1'
+base = 'C:/Users/iqraf/Downloads/nomera/Nomera_backend/app/api/v1'
 
 # Add RBAC to admin_router.py
 with open(os.path.join(base, 'admin_router.py'), 'r') as f:

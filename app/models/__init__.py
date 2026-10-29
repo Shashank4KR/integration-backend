@@ -82,6 +82,7 @@ from .academic_content_model import (
     StudentFeedback,
 )
 from .settings_model import SystemSetting
+from .marks_converter_model import MarksConversionHistory, MarksConversionRule
 from .exam_models import ExamSubject, ExamInvigilator, ExamTimetable
 from .school_model import School
 

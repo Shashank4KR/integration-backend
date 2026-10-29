@@ -41,13 +41,13 @@ async def test_attendance_academic_year_filtering(async_client: AsyncClient, db_
 
     admin_user = User(
         username="admin_att_test",
-        email="admin_att@cognora.edu",
+        email="admin_att@nomera.edu",
         password_hash="dummy",
         role_id=admin_role.id,
     )
     student_user = User(
         username="student_att_test",
-        email="student_att@cognora.edu",
+        email="student_att@nomera.edu",
         password_hash="dummy",
         role_id=student_role.id,
     )

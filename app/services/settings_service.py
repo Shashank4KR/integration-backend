@@ -7,12 +7,12 @@ from app.repositories.settings_repository import settings_repository
 
 DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
     "organization": {
-        "school_name": "Cognora Global Academy",
+        "school_name": "Nomera Global Academy",
         "school_code": "CGA-2026",
         "registered_address": "14 Education Lane, Bengaluru, Karnataka 560001",
         "contact_email": "admin@example.com",
         "contact_phone": "9876543210",
-        "website": "https://cognora.academy",
+        "website": "https://nomera.academy",
         "academic_year": "2026-2027",
         "affiliation": "Central Board of Secondary Education (CBSE)",
         "logo_url": None,

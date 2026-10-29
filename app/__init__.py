@@ -1,1 +1,1 @@
-"""EdTech Backend Application Package."""
+"""Nomera Backend Application Package."""

@@ -23,7 +23,7 @@ async def test_get_all_settings_returns_defaults(db_session: AsyncSession):
     assert "appearance" in all_settings
     assert "notifications" in all_settings
     assert "security" in all_settings
-    assert all_settings["organization"]["school_name"] == "Cognora Global Academy"
+    assert all_settings["organization"]["school_name"] == "Nomera Global Academy"
 
 
 @pytest.mark.asyncio

@@ -33,7 +33,7 @@ async def test_update_profile_success_and_persist(async_client: AsyncClient, db_
 
     user = User(
         username="admin_profile_test",
-        email="admin_test@cognora.edu",
+        email="admin_test@nomera.edu",
         password_hash=AuthService.hash_password("OldPassword123"),
         role_id=role.id,
         avatar_url="https://example.com/old.png",
@@ -75,7 +75,7 @@ async def test_change_password_workflow(async_client: AsyncClient, db_session: A
 
     user = User(
         username="teacher_pwd_test",
-        email="teacher_pwd@cognora.edu",
+        email="teacher_pwd@nomera.edu",
         password_hash=AuthService.hash_password("CurrentPassword123"),
         role_id=role.id,
     )
