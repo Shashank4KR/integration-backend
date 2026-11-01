@@ -6,11 +6,19 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from app.services.auth_service import AuthService
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, requests_per_minute: int = 60):
+    def __init__(
+        self,
+        app,
+        requests_per_minute: int = 60,
+        authenticated_requests_per_minute: int = 600,
+    ):
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
+        self.authenticated_requests_per_minute = authenticated_requests_per_minute
         self._window: float = 60.0
         self._requests: OrderedDict[str, deque[float]] = OrderedDict()
         self._max_clients = 10_000
@@ -20,17 +28,36 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client_ip: str = request.client.host if request.client else "unknown"
         now = time.monotonic()
         is_auth = request.url.path.rstrip("/").lower() in {"/auth/login", "/login"}
-        limit = min(self.requests_per_minute, 10) if is_auth else self.requests_per_minute
+        token_subject = None
+        authorization = request.headers.get("authorization", "")
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() == "bearer" and token:
+            payload = AuthService.verify_token(token)
+            subject = payload.get("sub") if payload else None
+            if isinstance(subject, str) and subject:
+                token_subject = subject
+
+        if is_auth:
+            bucket_key = f"ip:{client_ip}"
+            limit = min(self.requests_per_minute, 10)
+        elif token_subject:
+            # Authenticated users need a separate budget so one busy browser or a
+            # shared proxy IP cannot throttle every dashboard user at once.
+            bucket_key = f"user:{token_subject}"
+            limit = self.authenticated_requests_per_minute
+        else:
+            bucket_key = f"ip:{client_ip}"
+            limit = self.requests_per_minute
         with self._lock:
-            timestamps = self._requests.pop(client_ip, deque())
+            timestamps = self._requests.pop(bucket_key, deque())
             while timestamps and now - timestamps[0] >= self._window:
                 timestamps.popleft()
-            if len(self._requests) >= self._max_clients and client_ip not in self._requests:
+            if len(self._requests) >= self._max_clients and bucket_key not in self._requests:
                 self._requests.popitem(last=False)
             blocked = len(timestamps) >= limit
             if not blocked:
                 timestamps.append(now)
-            self._requests[client_ip] = timestamps
+            self._requests[bucket_key] = timestamps
             remaining = max(0, limit - len(timestamps))
 
         if blocked:
