@@ -9,6 +9,10 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, 
 class BoardDirection(str, Enum):
     CBSE_TO_STATE = "CBSE_TO_STATE"
     STATE_TO_CBSE = "STATE_TO_CBSE"
+    ICSE_TO_CBSE = "ICSE_TO_CBSE"
+    CBSE_TO_ICSE = "CBSE_TO_ICSE"
+    ICSE_TO_STATE = "ICSE_TO_STATE"
+    STATE_TO_ICSE = "STATE_TO_ICSE"
 
 
 class MarksConversionRequest(BaseModel):
