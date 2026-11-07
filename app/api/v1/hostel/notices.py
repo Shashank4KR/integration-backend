@@ -25,7 +25,8 @@ async def create_notice(payload: HostelNoticeCreate, session: AsyncSession = Dep
 @hostel_notice_router.get("", response_model=list[HostelNoticeResponse])
 async def list_notices(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
-    return await hostel_notice_service.list(session)
+    res = await hostel_notice_service.list(session)
+    return res['items'] if isinstance(res, dict) and 'items' in res else res
 
 @hostel_notice_router.get("/published", response_model=list[HostelNoticeResponse])
 async def list_published_notices(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):

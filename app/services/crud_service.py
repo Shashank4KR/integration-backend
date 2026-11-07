@@ -36,8 +36,10 @@ class CRUDService:
         await session.commit()
         return item
 
-    async def list(self, session: AsyncSession) -> list[Any]:
-        return await self.repository.list(session)
+    async def list(
+        self, session: AsyncSession, limit: int = 50, offset: int = 0
+    ) -> dict[str, Any]:
+        return await self.repository.list(session, limit=limit, offset=offset)
 
     async def get(self, session: AsyncSession, item_id: UUID) -> Any:
         item = await self.repository.get(session, item_id)

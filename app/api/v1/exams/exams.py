@@ -45,7 +45,8 @@ async def list_exams(
             select(Exam).where(Exam.class_id == class_id)
         )
         return result.scalars().all()
-    return await exam_service.list(session)
+    res = await exam_service.list(session)
+    return res["items"] if isinstance(res, dict) and "items" in res else res
 
 
 @router.get("/{item_id}", response_model=ExamResponse)
@@ -98,4 +99,3 @@ async def get_exam_toppers(
 ):
     _ensure_can_read_exams(current_user)
     return await report_card_service.get_toppers(session, exam_id)
-

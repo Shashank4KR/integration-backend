@@ -140,7 +140,8 @@ class FeeInvoiceService(CRUDService):
             normalized = status.strip().upper()
             items = await fee_invoice_repository.get_by_status(session, normalized)
         else:
-            items = await super().list(session)
+            res = await super().list(session)
+            items = res["items"] if isinstance(res, dict) and "items" in res else res
         for item in items:
             await self._set_invoice_status(session, item)
         if status:

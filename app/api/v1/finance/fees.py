@@ -74,7 +74,9 @@ async def create_fee_structure(payload: FeeStructureCreate, session: AsyncSessio
     _ensure_admin_or_accountant(current_user)
     return await fee_structure_service.create(session, payload.model_dump())
 @fee_structure_router.get("", response_model=list[FeeStructureResponse])
-async def list_fee_structures(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await fee_structure_service.list(session)
+async def list_fee_structures(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    res = await fee_structure_service.list(session)
+    return res['items'] if isinstance(res, dict) and 'items' in res else res
 @fee_structure_router.get("/{item_id}", response_model=FeeStructureResponse)
 async def get_fee_structure(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await fee_structure_service.get(session, item_id)
 @fee_structure_router.put("/{item_id}", response_model=FeeStructureResponse)
@@ -104,7 +106,8 @@ async def list_fee_invoices(
             return await fee_invoice_service.get_by_student_and_status(session, student_id, status)
         elif student_id:
             return await fee_invoice_service.get_by_student(session, student_id)
-        return await fee_invoice_service.list(session, status=status)
+        res = await fee_invoice_service.list(session, status=status)
+        return res['items'] if isinstance(res, dict) and 'items' in res else res
 
     if role_name == "STUDENT":
         student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
@@ -173,7 +176,8 @@ async def list_payments(
     if role_name in ("ADMIN", "ACCOUNTANT"):
         if student_id:
             return await payment_service.get_by_student(session, student_id)
-        return await payment_service.list(session)
+        res = await payment_service.list(session)
+        return res['items'] if isinstance(res, dict) and 'items' in res else res
 
     if role_name == "STUDENT":
         student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))

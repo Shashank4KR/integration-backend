@@ -153,7 +153,8 @@ async def create_exam_result(
 
 @router.get("", response_model=list[ExamResultResponse])
 async def list_exam_results(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return await exam_result_service.list(session)
+    res = await exam_result_service.list(session)
+    return res["items"] if isinstance(res, dict) and "items" in res else res
 
 
 @router.get("/{item_id}", response_model=ExamResultResponse)

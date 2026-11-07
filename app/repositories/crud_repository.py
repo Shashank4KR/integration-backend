@@ -1,7 +1,7 @@
 from typing import Any, Generic, TypeVar
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 ModelT = TypeVar("ModelT")
@@ -18,9 +18,22 @@ class CRUDRepository(Generic[ModelT]):
         await session.refresh(item)
         return item
 
-    async def list(self, session: AsyncSession) -> list[ModelT]:
-        result = await session.execute(select(self.model))
-        return list(result.scalars().all())
+    async def list(
+        self,
+        session: AsyncSession,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        safe_limit = min(max(1, limit), 200)
+        safe_offset = max(0, offset)
+
+        count_stmt = select(func.count()).select_from(self.model)
+        total_res = await session.execute(count_stmt)
+        total = total_res.scalar() or 0
+
+        stmt = select(self.model).offset(safe_offset).limit(safe_limit)
+        result = await session.execute(stmt)
+        return {"items": list(result.scalars().all()), "total": total}
 
     async def get(self, session: AsyncSession, item_id: UUID) -> ModelT | None:
         result = await session.execute(select(self.model).where(self.model.id == item_id))

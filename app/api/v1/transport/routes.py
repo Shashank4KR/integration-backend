@@ -139,7 +139,8 @@ async def transport_overview(session: AsyncSession = Depends(get_db), current_us
     data = await transport_summary(session)
 
     route_distribution = []
-    routes = await route_service.list(session)
+    routes_res = await route_service.list(session)
+    routes = routes_res["items"] if isinstance(routes_res, dict) and "items" in routes_res else routes
     for route in routes:
         student_count = await session.scalar(
             select(func.count(StudentTransport.id)).where(StudentTransport.route_id == route.id)
@@ -152,7 +153,8 @@ async def transport_overview(session: AsyncSession = Depends(get_db), current_us
             "active": True,
         })
 
-    buses = await bus_service.list(session)
+    buses_res = await bus_service.list(session)
+    buses = buses_res["items"] if isinstance(buses_res, dict) and "items" in buses_res else buses
     running_buses = len(buses)
     delayed_buses = 0
     completed_buses = 0

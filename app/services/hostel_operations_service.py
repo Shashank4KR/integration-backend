@@ -24,7 +24,8 @@ class HostelFeeInvoiceService(CRUDService):
   if await s.get(Student,d['student_id']) is None or (fee:=await s.get(HostelFeeStructure,d['hostel_fee_id'])) is None: bad('Student and hostel fee structure must exist')
   d['amount']=d.get('amount') or fee.amount; d['status']=HostelInvoiceStatus.PENDING; return await super().create(s,d)
  async def list(self,s):
-  xs=await super().list(s)
+  res=await super().list(s)
+  xs=res["items"] if isinstance(res, dict) and "items" in res else res
   for x in xs:
    if x.status==HostelInvoiceStatus.PENDING and x.due_date<date.today(): x.status=HostelInvoiceStatus.OVERDUE
   await s.commit(); return xs

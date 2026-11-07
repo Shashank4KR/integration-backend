@@ -1,7 +1,8 @@
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import create_model
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
@@ -33,6 +34,12 @@ def build_crud_router(
 ) -> APIRouter:
     router = APIRouter()
 
+    PaginatedResponse = create_model(
+        f"Paginated{response_schema.__name__}",
+        items=(list[response_schema], ...),
+        total=(int, ...),
+    )
+
     @router.post("", response_model=response_schema, status_code=status.HTTP_201_CREATED)
     async def create(
         payload: create_schema,
@@ -42,13 +49,15 @@ def build_crud_router(
         require_roles(current_user, write_roles)
         return await service.create(session, payload.model_dump())
 
-    @router.get("", response_model=list[response_schema])
+    @router.get("", response_model=PaginatedResponse)
     async def list_items(
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
         session: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
     ):
         require_roles(current_user, read_roles)
-        return await service.list(session)
+        return await service.list(session, limit=limit, offset=offset)
 
     @router.get("/{item_id:uuid}", response_model=response_schema)
     async def get(

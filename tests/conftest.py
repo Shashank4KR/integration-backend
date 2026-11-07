@@ -9,10 +9,31 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
+from app.core.rate_limit import RateLimitMiddleware
 from app.main import app
 
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    """Ensure in-memory rate limits are cleared between tests for test isolation."""
+    cur = getattr(app, "middleware_stack", None)
+    while cur is not None:
+        if isinstance(cur, RateLimitMiddleware):
+            with cur._lock:
+                cur._requests.clear()
+            break
+        cur = getattr(cur, "app", None)
+    yield
+    cur = getattr(app, "middleware_stack", None)
+    while cur is not None:
+        if isinstance(cur, RateLimitMiddleware):
+            with cur._lock:
+                cur._requests.clear()
+            break
+        cur = getattr(cur, "app", None)
 
 
 @pytest.fixture(scope="session")

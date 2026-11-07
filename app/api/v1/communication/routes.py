@@ -205,7 +205,8 @@ async def get_notifications(
     current_user: User = Depends(get_current_user),
 ):
     if scope == "all" and current_user.role and current_user.role.role_name == "ADMIN":
-        return await notification_service.list(session)
+        res = await notification_service.list(session)
+        return res["items"] if isinstance(res, dict) and "items" in res else res
     return await notification_service.get_notifications(session, current_user.id)
 @notification_router.get("/{item_id}", response_model=NotificationResponse)
 async def get_notification(
@@ -376,7 +377,8 @@ async def get_messages(
     current_user: User = Depends(get_current_user),
 ):
     if scope == "all" and current_user.role and current_user.role.role_name == "ADMIN":
-        return await message_service.list(session)
+        res = await message_service.list(session)
+        return res["items"] if isinstance(res, dict) and "items" in res else res
     result = await session.execute(
         select(Message)
         .where(

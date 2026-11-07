@@ -46,7 +46,8 @@ async def list_students(
         result = await session.execute(select(Student).where(Student.class_id == class_id))
         students = list(result.scalars().all())
     else:
-        students = list(await student_service.list(session))
+        res = await student_service.list(session)
+        students = res["items"] if isinstance(res, dict) and "items" in res else list(res)
 
     for st in students:
         if not st.class_name and st.class_:

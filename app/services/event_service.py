@@ -52,7 +52,8 @@ class EventService(CRUDService):
     async def get_upcoming(self, session: AsyncSession): return await self.repository.get_upcoming(session, date.today())
 
     async def get_summary(self, session: AsyncSession) -> dict:
-        events = await self.list(session)
+        events_res = await self.list(session)
+        events = events_res["items"] if isinstance(events_res, dict) and "items" in events_res else events
         holidays = await academic_calendar_repository.get_holidays(session)
         return {"total_events": len(events), "upcoming_events": sum(e.start_date >= date.today() for e in events), "holidays": len(holidays), "academic_events": sum(e.event_type == "ACADEMIC" for e in events)}
 

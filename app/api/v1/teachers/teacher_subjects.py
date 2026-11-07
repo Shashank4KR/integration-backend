@@ -38,7 +38,8 @@ async def list_teacher_subjects(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await teacher_subject_service.list(session)
+    res = await teacher_subject_service.list(session)
+    return res["items"] if isinstance(res, dict) and "items" in res else res
 
 
 @router.get("/{item_id}", response_model=TeacherSubjectResponse)

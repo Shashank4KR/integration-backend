@@ -26,7 +26,8 @@ async def create_complaint(payload: HostelComplaintCreate, session: AsyncSession
 @hostel_complaint_router.get("", response_model=list[HostelComplaintResponse])
 async def list_complaints(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
-    return await hostel_complaint_service.list(session)
+    res = await hostel_complaint_service.list(session)
+    return res['items'] if isinstance(res, dict) and 'items' in res else res
 
 @hostel_complaint_router.get("/{item_id}", response_model=HostelComplaintResponse)
 async def get_complaint(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -81,7 +82,8 @@ async def resolve_complaint(item_id: UUID, payload: HostelComplaintUpdate, sessi
 
 @hostel_complaint_router.get("/summary", response_model=HostelComplaintSummaryResponse)
 async def complaint_summary(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    items = await hostel_complaint_service.list(session)
+    res = await hostel_complaint_service.list(session)
+    items = res['items'] if isinstance(res, dict) and 'items' in res else res
     return HostelComplaintSummaryResponse(
         total_open=sum(1 for i in items if i.resolution_status == "OPEN"),
         total_in_progress=sum(1 for i in items if i.resolution_status == "IN_PROGRESS"),

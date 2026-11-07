@@ -26,7 +26,8 @@ async def create_leave_request(payload: HostelLeaveRequestCreate, session: Async
 @hostel_leave_router.get("", response_model=list[HostelLeaveRequestResponse])
 async def list_leave_requests(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
-    return await hostel_leave_request_service.list(session)
+    res = await hostel_leave_request_service.list(session)
+    return res['items'] if isinstance(res, dict) and 'items' in res else res
 
 @hostel_leave_router.get("/{item_id}", response_model=HostelLeaveRequestResponse)
 async def get_leave_request(item_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):

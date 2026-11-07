@@ -77,7 +77,8 @@ def crud(prefix, create, response, service, write_role_check=None, read_role_che
     async def list_items(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
         if read_role_check:
             read_role_check(current_user)
-        return await service.list(s)
+        res = await service.list(s)
+        return res['items'] if isinstance(res, dict) and 'items' in res else res
 
     if include_get_by_id:
         @r.get('/{item_id}', response_model=response)
@@ -113,7 +114,8 @@ mess_menu_router = APIRouter()
 
 @mess_menu_router.get('', response_model=list[MessMenuResponse])
 async def list_mess_menus(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return await mess_menu_service.list(s)
+    res = await mess_menu_service.list(s)
+    return res['items'] if isinstance(res, dict) and 'items' in res else res
 
 @mess_menu_router.post('', response_model=MessMenuResponse, status_code=status.HTTP_201_CREATED)
 async def create_mess_menu(
@@ -208,7 +210,8 @@ async def complaint_resolve(item_id: UUID, p: HostelComplaintUpdate, s: AsyncSes
 @hostel_complaint_router.get('/summary', response_model=HostelComplaintSummaryResponse)
 async def complaint_summary(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
-    return await hostel_complaint_service.list(s)
+    res = await hostel_complaint_service.list(s)
+    return res['items'] if isinstance(res, dict) and 'items' in res else res
 
 hostel_notice_router = crud('', HostelNoticeCreate, HostelNoticeResponse, hostel_notice_service, write_role_check=_ensure_admin, read_role_check=_ensure_admin)
 @hostel_notice_router.get('/{item_id}', response_model=HostelNoticeResponse)
@@ -329,7 +332,8 @@ async def maintenance_dashboard(s: AsyncSession = Depends(get_db), current_user:
 @hostel_extra_router.get('/complaint-summary')
 async def complaint_summary(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
-    items = await hostel_complaint_service.list(s)
+    res = await hostel_complaint_service.list(s)
+    items = res['items'] if isinstance(res, dict) and 'items' in res else res
     return HostelComplaintSummaryResponse(
         total_open=sum(1 for i in items if i.resolution_status == 'OPEN'),
         total_in_progress=sum(1 for i in items if i.resolution_status == 'IN_PROGRESS'),
@@ -339,7 +343,8 @@ async def complaint_summary(s: AsyncSession = Depends(get_db), current_user: Use
 @hostel_extra_router.get('/leave-summary')
 async def leave_summary(s: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
-    items = await hostel_leave_request_service.list(s)
+    res = await hostel_leave_request_service.list(s)
+    items = res['items'] if isinstance(res, dict) and 'items' in res else res
     return HostelLeaveSummaryResponse(
         total_pending=sum(1 for i in items if i.approval_status == 'PENDING'),
         total_approved=sum(1 for i in items if i.approval_status == 'APPROVED'),
