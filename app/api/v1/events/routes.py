@@ -21,7 +21,7 @@ event_router = APIRouter()
 
 
 def _ensure_admin(current_user: User) -> None:
-    if current_user.role.role_name != "ADMIN":
+    if current_user.role.role_name not in ("ADMIN", "SUPER_ADMIN"):
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -32,10 +32,15 @@ def _ensure_admin(current_user: User) -> None:
 @event_router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 async def create_event(payload: EventCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     _ensure_admin(current_user)
-    return await event_service.create_event(session, payload.model_dump())
+    data = payload.model_dump()
+    if not data.get("created_by"):
+        data["created_by"] = current_user.id
+    return await event_service.create_event(session, data)
 
 @event_router.get("", response_model=list[EventResponse])
-async def get_events(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await event_service.get_events(session)
+async def get_events(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    res = await event_service.get_events(session)
+    return res["items"] if isinstance(res, dict) and "items" in res else res
 
 @event_router.get("/type/{event_type}", response_model=list[EventResponse])
 async def get_events_by_type(event_type: str, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await event_service.get_by_type(session, event_type)
@@ -72,7 +77,9 @@ async def create_calendar_entry(payload: AcademicCalendarCreate, session: AsyncS
     return await academic_calendar_service.create_calendar_entry(session, payload.model_dump())
 
 @academic_calendar_router.get("", response_model=list[AcademicCalendarResponse])
-async def get_calendar_entries(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await academic_calendar_service.get_calendar_entries(session)
+async def get_calendar_entries(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    res = await academic_calendar_service.get_calendar_entries(session)
+    return res["items"] if isinstance(res, dict) and "items" in res else res
 
 @academic_calendar_router.get("/month/{year}/{month}", response_model=list[AcademicCalendarResponse])
 async def get_calendar_entries_by_month(year: int, month: int, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)): return await academic_calendar_service.get_by_month(session, year, month)

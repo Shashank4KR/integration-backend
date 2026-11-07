@@ -11,7 +11,7 @@ class EventCreate(BaseModel):
     start_date: date
     end_date: date
     venue: str | None = None
-    created_by: UUID
+    created_by: UUID | None = None
 
 
 class EventUpdate(BaseModel):

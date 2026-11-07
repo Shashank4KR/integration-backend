@@ -32,7 +32,9 @@ class EventService(CRUDService):
 
     async def delete_event(self, session: AsyncSession, item_id: UUID): return await self.delete(session, item_id)
     async def get_event(self, session: AsyncSession, item_id: UUID): return await self.get(session, item_id)
-    async def get_events(self, session: AsyncSession): return await self.list(session)
+    async def get_events(self, session: AsyncSession):
+        res = await self.list(session)
+        return res["items"] if isinstance(res, dict) and "items" in res else res
 
     def _validate_event_data(self, data: dict, existing=None) -> None:
         if "event_name" in data and not data["event_name"].strip(): _bad_request("Event name cannot be empty")
@@ -70,7 +72,9 @@ class AcademicCalendarService(CRUDService):
 
     async def delete_calendar_entry(self, session: AsyncSession, item_id: UUID): return await self.delete(session, item_id)
     async def get_calendar_entry(self, session: AsyncSession, item_id: UUID): return await self.get(session, item_id)
-    async def get_calendar_entries(self, session: AsyncSession): return await self.list(session)
+    async def get_calendar_entries(self, session: AsyncSession):
+        res = await self.list(session)
+        return res["items"] if isinstance(res, dict) and "items" in res else res
 
     def _validate_calendar_data(self, data: dict, existing=None) -> None:
         if "title" in data and not data["title"].strip(): _bad_request("Title cannot be empty")
