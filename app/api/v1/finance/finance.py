@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Query, status
+from fastapi import APIRouter, Body, Depends, Header, Query, status
+from app.services.idempotency_service import IdempotencyService
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.student_model import Student
@@ -272,15 +273,36 @@ async def process_salary(
 @finance_router.post("/salary/bulk-process", status_code=status.HTTP_201_CREATED)
 async def bulk_process_salary(
     payload: list[SalaryCreate],
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    x_idempotency_key: str | None = Header(None, alias="X-Idempotency-Key"),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin(current_user)
-    results = []
-    for item_data in payload:
-        item = await finance_service.create_salary(session, item_data.model_dump())
-        results.append(item)
-    return success_response(results, message=f"{len(results)} salaries processed successfully")
+    effective_key = idempotency_key or x_idempotency_key
+    record, cached = await IdempotencyService.get_or_create(
+        session=session,
+        idempotency_key=effective_key,
+        user_id=current_user.id,
+        endpoint="POST /finance/salary/bulk-process",
+        payload_data=[p.model_dump() for p in payload],
+    )
+    if cached is not None:
+        return cached
+
+    try:
+        results = []
+        for item_data in payload:
+            item = await finance_service.create_salary(session, item_data.model_dump())
+            results.append(item)
+        resp_data = success_response(results, message=f"{len(results)} salaries processed successfully")
+        await IdempotencyService.complete(session, record, status.HTTP_201_CREATED, resp_data)
+        await session.commit()
+        return resp_data
+    except Exception:
+        await IdempotencyService.fail(session, record)
+        await session.commit()
+        raise
 
 
 @finance_router.get("/salary/{item_id}")
@@ -591,10 +613,23 @@ async def list_payments(
 @finance_router.post("/payments", status_code=status.HTTP_201_CREATED)
 async def create_payment(
     payload: PaymentCreate,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    x_idempotency_key: str | None = Header(None, alias="X-Idempotency-Key"),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin_or_accountant(current_user)
+    effective_key = idempotency_key or x_idempotency_key
+    record, cached = await IdempotencyService.get_or_create(
+        session=session,
+        idempotency_key=effective_key,
+        user_id=current_user.id,
+        endpoint="POST /finance/payments",
+        payload_data=payload.model_dump(),
+    )
+    if cached is not None:
+        return cached
+
     data = payload.model_dump()
     method_str = str(data.get("payment_method", "ONLINE")).upper().replace(" ", "_").replace("/", "_")
     if "UPI" in method_str:
@@ -609,8 +644,17 @@ async def create_payment(
         data["payment_method"] = "BANK_TRANSFER"
     else:
         data["payment_method"] = "ONLINE"
-    item = await payment_service.create(session, data)
-    return success_response(item, message="Payment recorded successfully")
+
+    try:
+        item = await payment_service.create(session, data)
+        resp_data = success_response(item, message="Payment recorded successfully")
+        await IdempotencyService.complete(session, record, status.HTTP_201_CREATED, resp_data)
+        await session.commit()
+        return resp_data
+    except Exception:
+        await IdempotencyService.fail(session, record)
+        await session.commit()
+        raise
 
 
 # Student Categories

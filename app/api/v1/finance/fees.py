@@ -1,5 +1,6 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from app.services.idempotency_service import IdempotencyService
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -162,9 +163,34 @@ async def invoice_payments(
 payment_router = APIRouter()
 
 @payment_router.post("", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
-async def create_payment(payload: PaymentCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def create_payment(
+    payload: PaymentCreate,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    x_idempotency_key: str | None = Header(None, alias="X-Idempotency-Key"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     _ensure_admin_or_accountant(current_user)
-    return await payment_service.create(session, payload.model_dump())
+    effective_key = idempotency_key or x_idempotency_key
+    record, cached = await IdempotencyService.get_or_create(
+        session=session,
+        idempotency_key=effective_key,
+        user_id=current_user.id,
+        endpoint="POST /payments",
+        payload_data=payload.model_dump(),
+    )
+    if cached is not None:
+        return cached
+
+    try:
+        result = await payment_service.create(session, payload.model_dump())
+        await IdempotencyService.complete(session, record, status.HTTP_201_CREATED, result)
+        await session.commit()
+        return result
+    except Exception:
+        await IdempotencyService.fail(session, record)
+        await session.commit()
+        raise
 
 @payment_router.get("", response_model=list[PaymentResponse])
 async def list_payments(
