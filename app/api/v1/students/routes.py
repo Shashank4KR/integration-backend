@@ -1,3 +1,4 @@
+from app.schemas.assignment_schema import StudentAssignmentSubmissionRequest
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -353,18 +354,15 @@ async def get_current_student_transport(
 
 @router.post("/me/submit-assignment", response_model=dict)
 async def submit_assignment_for_me(
-    payload: dict,
+    payload: StudentAssignmentSubmissionRequest,
     student: Student = Depends(get_current_student),
     session: AsyncSession = Depends(get_db),
 ):
     from app.models.assignment_model import AssignmentSubmission
     from datetime import datetime, timezone
 
-    assignment_id_str = payload.get("assignment_id")
-    if not assignment_id_str:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="assignment_id is required")
-    assignment_id = UUID(assignment_id_str)
-    file_path = payload.get("file_path", "")
+    assignment_id = payload.assignment_id
+    file_path = payload.file_path
 
     res = await session.execute(
         select(AssignmentSubmission).where(

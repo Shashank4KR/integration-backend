@@ -3,9 +3,10 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from app.schemas.base import BaseSchema
 
 
-class TeacherCreate(BaseModel):
+class TeacherCreate(BaseSchema):
     user_id: UUID
     employee_id: str = Field(..., min_length=1, max_length=50)
     qualification: Optional[str] = Field(None, max_length=255)
@@ -25,7 +26,7 @@ class TeacherCreate(BaseModel):
         return cleaned
 
 
-class TeacherUpdate(BaseModel):
+class TeacherUpdate(BaseSchema):
     user_id: Optional[UUID] = None
     employee_id: Optional[str] = Field(None, min_length=1, max_length=50)
     qualification: Optional[str] = Field(None, max_length=255)

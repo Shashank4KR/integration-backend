@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.services.role_resolver import resolve_role
 from app.services.auth_service import AuthService
 from app.schemas.user import UserCreate, UserCreateResponse, UserResponse
+from app.schemas.settings_schema import ProfileUpdateRequest, ChangePasswordRequest
 from app.models.user import User
 from app.services.audit_service import audit_log_service, login_history_service
 
@@ -234,13 +235,13 @@ async def read_users_me(
 
 @router.put("/profile", response_model=UserResponse)
 async def update_profile(
-    payload: dict,
+    payload: ProfileUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    new_username = payload.get("username")
-    new_email = payload.get("email")
-    new_phone = payload.get("phone")
+    new_username = payload.username
+    new_email = payload.email
+    new_phone = payload.phone
 
     if new_username and new_username != current_user.username:
         result = await db.execute(
@@ -267,15 +268,10 @@ async def update_profile(
     if new_phone is not None:
         current_user.phone = new_phone
 
-    if "avatar_url" in payload:
-        new_avatar = payload.get("avatar_url")
-        if new_avatar is not None:
-            if not isinstance(new_avatar, str):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid avatar format")
-            if len(new_avatar) > 4_000_000:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar image is too large (max 3MB)")
-            if not (new_avatar.startswith(("data:image/", "http://", "https://", "/"))):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar must be a valid image URL or data URI")
+    if payload.avatar_url is not None:
+        new_avatar = payload.avatar_url
+        if not (new_avatar.startswith(("data:image/", "http://", "https://", "/"))):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar must be a valid image URL or data URI")
         current_user.avatar_url = new_avatar
 
     db.add(current_user)
@@ -295,18 +291,12 @@ async def update_profile(
 
 @router.post("/change-password")
 async def change_password(
-    payload: dict,
+    payload: ChangePasswordRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    current_password = payload.get("current_password")
-    new_password = payload.get("new_password")
-
-    if not current_password or not new_password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password and new password are required",
-        )
+    current_password = payload.current_password
+    new_password = payload.new_password
 
     if not AuthService.verify_password(current_password, current_user.password_hash):
         raise HTTPException(

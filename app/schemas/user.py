@@ -3,6 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_serializer, field_validator
+from app.schemas.base import BaseSchema
 
 
 class RoleResponse(BaseModel):
@@ -17,7 +18,7 @@ class RoleResponse(BaseModel):
         return f"{value.int & 0xffff:04d}"
 
 
-class UserCreate(BaseModel):
+class UserCreate(BaseSchema):
     username: str = Field(..., min_length=1, max_length=255)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
@@ -36,7 +37,7 @@ class UserCreate(BaseModel):
         return cleaned
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(BaseSchema):
     username: Optional[str] = Field(default=None, min_length=1, max_length=255)
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(default=None, min_length=8, max_length=128)

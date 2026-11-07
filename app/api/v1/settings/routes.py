@@ -8,6 +8,7 @@ from app.models.user import User
 from app.schemas.settings_schema import (
     CategorySettingsUpdate,
     SettingsCategoryResponse,
+    SystemSettingsBulkUpdate,
 )
 from app.services.settings_service import settings_service
 
@@ -44,14 +45,12 @@ async def get_all_settings(
 
 @settings_router.put("", response_model=dict[str, Any])
 async def update_all_settings(
-    payload: dict[str, Any],
+    payload: SystemSettingsBulkUpdate,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     _ensure_admin_or_privileged(current_user)
-    # Check if payload has a top level 'settings' key or is directly a dict of categories
-    settings_dict = payload.get("settings", payload)
-    return await settings_service.bulk_update_settings(session, settings_dict)
+    return await settings_service.bulk_update_settings(session, payload.settings)
 
 
 @settings_router.get("/{category}", response_model=dict[str, Any])

@@ -453,3 +453,38 @@ class ReportPaginationParams(BaseModel):
     class_id: UUID | None = None
     section: str | None = None
     student_id: UUID | None = None
+
+
+class BulkAssignFeeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    student_ids: list[UUID] = Field(..., min_length=1)
+    fee_structure_id: UUID
+    academic_year: str | None = Field(None, max_length=20)
+    due_date: date | None = None
+
+
+class ScholarshipApproveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    approved_amount: Decimal | None = Field(None, ge=0)
+    approval_date: datetime | None = None
+
+
+class ScholarshipRejectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    reason: str | None = Field(None, max_length=500)
+
+
+class RefundApproveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    approval_date: datetime | None = None
+
+
+class RefundProcessRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    processed_date: datetime | None = None
+    transaction_no: str | None = Field(None, max_length=100)
+
+
+class RefundRejectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    reason: str | None = Field(None, max_length=500)

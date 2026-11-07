@@ -2,9 +2,10 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from app.schemas.base import BaseSchema
 
 
-class ParentBase(BaseModel):
+class ParentBase(BaseSchema):
     occupation: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
     address: Optional[str] = None
@@ -24,7 +25,7 @@ class ParentCreate(ParentBase):
     user_id: UUID
 
 
-class ParentUpdate(BaseModel):
+class ParentUpdate(BaseSchema):
     user_id: Optional[UUID] = None
     occupation: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)

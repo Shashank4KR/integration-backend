@@ -68,6 +68,12 @@ from app.schemas.fee_schema import (
     StudentLedgerSummaryResponse,
 )
 from app.schemas.finance_schema import (
+    BulkAssignFeeRequest,
+    RefundApproveRequest,
+    RefundProcessRequest,
+    RefundRejectRequest,
+    ScholarshipApproveRequest,
+    ScholarshipRejectRequest,
     AdminDashboardResponse,
     ExpenseCategoryCreate,
     ExpenseCategoryResponse,
@@ -783,22 +789,20 @@ async def delete_student_fee_assignment(
 
 @finance_router.post("/student-fee-assignments/bulk-assign")
 async def bulk_assign_fee(
-    payload: dict = Body(...),
+    payload: BulkAssignFeeRequest = Body(...),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin_or_accountant(current_user)
-    student_ids = payload.get("student_ids", [])
-    fee_structure_id = payload.get("fee_structure_id")
-    academic_year = payload.get("academic_year")
-    due_date = payload.get("due_date")
-    if not student_ids or not fee_structure_id:
-        raise APIException(status_code=status.HTTP_400_BAD_REQUEST, message="student_ids and fee_structure_id are required")
+    student_ids = payload.student_ids
+    fee_structure_id = payload.fee_structure_id
+    academic_year = payload.academic_year
+    due_date = payload.due_date
     created = []
     for sid in student_ids:
         try:
             invoices = await fee_invoice_service.assign_fee_to_student(
-                session, UUID(sid), {"fee_structure_id": UUID(fee_structure_id), "academic_year": academic_year, "due_date": due_date}
+                session, sid, {"fee_structure_id": fee_structure_id, "academic_year": academic_year, "due_date": due_date}
             )
             created.extend(invoices)
         except Exception:
@@ -901,24 +905,24 @@ async def update_scholarship(
 @finance_router.post("/scholarships/{item_id}/approve")
 async def approve_scholarship(
     item_id: UUID,
-    payload: dict = Body(...),
+    payload: ScholarshipApproveRequest = Body(default_factory=ScholarshipApproveRequest),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin(current_user)
-    item = await student_scholarship_service.approve(session, item_id, {"approved_by": current_user.id, **payload})
+    item = await student_scholarship_service.approve(session, item_id, {"approved_by": current_user.id, **payload.model_dump(exclude_unset=True)})
     return success_response(item, message="Scholarship approved successfully")
 
 
 @finance_router.post("/scholarships/{item_id}/reject")
 async def reject_scholarship(
     item_id: UUID,
-    payload: dict = Body(...),
+    payload: ScholarshipRejectRequest = Body(default_factory=ScholarshipRejectRequest),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin(current_user)
-    item = await student_scholarship_service.reject(session, item_id, payload)
+    item = await student_scholarship_service.reject(session, item_id, payload.model_dump(exclude_unset=True))
     return success_response(item, message="Scholarship rejected")
 
 
@@ -1031,36 +1035,36 @@ async def update_refund(
 @finance_router.post("/refunds/{item_id}/approve")
 async def approve_refund(
     item_id: UUID,
-    payload: dict = Body(...),
+    payload: RefundApproveRequest = Body(default_factory=RefundApproveRequest),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin(current_user)
-    item = await refund_service.approve(session, item_id, {"approved_by": current_user.id, **payload})
+    item = await refund_service.approve(session, item_id, {"approved_by": current_user.id, **payload.model_dump(exclude_unset=True)})
     return success_response(item, message="Refund approved successfully")
 
 
 @finance_router.post("/refunds/{item_id}/process")
 async def process_refund(
     item_id: UUID,
-    payload: dict = Body(...),
+    payload: RefundProcessRequest = Body(default_factory=RefundProcessRequest),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin(current_user)
-    item = await refund_service.process_refund(session, item_id, payload)
+    item = await refund_service.process_refund(session, item_id, payload.model_dump(exclude_unset=True))
     return success_response(item, message="Refund processed successfully")
 
 
 @finance_router.post("/refunds/{item_id}/reject")
 async def reject_refund(
     item_id: UUID,
-    payload: dict = Body(...),
+    payload: RefundRejectRequest = Body(default_factory=RefundRejectRequest),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin(current_user)
-    item = await refund_service.reject(session, item_id, payload)
+    item = await refund_service.reject(session, item_id, payload.model_dump(exclude_unset=True))
     return success_response(item, message="Refund rejected")
 
 

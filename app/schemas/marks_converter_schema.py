@@ -4,6 +4,7 @@ from enum import Enum
 from uuid import UUID
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
+from app.schemas.base import BaseSchema
 
 
 class BoardDirection(str, Enum):
@@ -15,7 +16,7 @@ class BoardDirection(str, Enum):
     STATE_TO_ICSE = "STATE_TO_ICSE"
 
 
-class MarksConversionRequest(BaseModel):
+class MarksConversionRequest(BaseSchema):
     board_direction: BoardDirection
     state: str = Field(min_length=2, max_length=80)
     class_grade: str = Field(min_length=1, max_length=32)
@@ -43,7 +44,7 @@ class MarksConversionRequest(BaseModel):
         return self
 
 
-class MarksConversionRuleCreate(BaseModel):
+class MarksConversionRuleCreate(BaseSchema):
     board_direction: BoardDirection
     state: str = Field(min_length=2, max_length=80)
     class_grade: str = Field(min_length=1, max_length=32)
@@ -75,7 +76,7 @@ class MarksConversionRuleCreate(BaseModel):
         return self
 
 
-class MarksConversionRuleUpdate(BaseModel):
+class MarksConversionRuleUpdate(BaseSchema):
     board_direction: BoardDirection | None = None
     state: str | None = Field(default=None, min_length=2, max_length=80)
     class_grade: str | None = Field(default=None, min_length=1, max_length=32)

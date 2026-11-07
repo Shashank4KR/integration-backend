@@ -3,9 +3,10 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.base import BaseSchema
 
 
-class ClassCreate(BaseModel):
+class ClassCreate(BaseSchema):
     class_name: str = Field(..., min_length=1, max_length=100)
     section: str = Field(..., min_length=1, max_length=50)
     academic_year: str = Field(..., min_length=1, max_length=20)
@@ -14,7 +15,7 @@ class ClassCreate(BaseModel):
     status: Optional[str] = Field("ACTIVE", max_length=20)
 
 
-class ClassUpdate(BaseModel):
+class ClassUpdate(BaseSchema):
     class_name: Optional[str] = Field(None, min_length=1, max_length=100)
     section: Optional[str] = Field(None, min_length=1, max_length=50)
     academic_year: Optional[str] = Field(None, min_length=1, max_length=20)

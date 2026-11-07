@@ -3,9 +3,10 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.base import BaseSchema
 
 
-class SubjectCreate(BaseModel):
+class SubjectCreate(BaseSchema):
     subject_code: str = Field(..., min_length=1, max_length=50)
     subject_name: str = Field(..., min_length=1, max_length=255)
     department_id: Optional[UUID] = None
@@ -15,7 +16,7 @@ class SubjectCreate(BaseModel):
     status: Optional[str] = Field(default="ACTIVE", max_length=20)
 
 
-class SubjectUpdate(BaseModel):
+class SubjectUpdate(BaseSchema):
     subject_code: Optional[str] = Field(None, min_length=1, max_length=50)
     subject_name: Optional[str] = Field(None, min_length=1, max_length=255)
     department_id: Optional[UUID] = None

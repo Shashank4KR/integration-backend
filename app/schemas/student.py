@@ -3,9 +3,10 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.base import BaseSchema
 
 
-class StudentBase(BaseModel):
+class StudentBase(BaseSchema):
     admission_no: str = Field(..., min_length=1, max_length=50)
     first_name: Optional[str] = Field(None, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
@@ -22,7 +23,7 @@ class StudentCreate(StudentBase):
     user_id: UUID
 
 
-class StudentUpdate(BaseModel):
+class StudentUpdate(BaseSchema):
     user_id: Optional[UUID] = None
     admission_no: Optional[str] = Field(None, min_length=1, max_length=50)
     first_name: Optional[str] = Field(None, max_length=100)
