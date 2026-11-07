@@ -7,6 +7,8 @@ PUBLIC_ALLOWLIST = {
     ("GET", "/health"),
     ("POST", "/auth/login"),
     ("POST", "/login"),
+    ("POST", "/auth/refresh"),
+    ("POST", "/refresh"),
     ("GET", "/settings/public/system-status"),
 }
 
