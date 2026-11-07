@@ -44,6 +44,12 @@ class User(Base):
     token_version: Mapped[int] = mapped_column(
         Integer, default=1, server_default="1"
     )
+    mfa_secret: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
+    mfa_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
     role_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("roles.id"), nullable=False
     )

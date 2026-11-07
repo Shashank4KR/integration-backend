@@ -12,6 +12,8 @@ from app.core.database import get_db
 from app.models.refresh_token_model import RefreshToken
 from app.models.user import User
 from app.schemas.auth_schema import (
+    MFASetupResponse,
+    MFAVerifyRequest,
     RefreshTokenRequest,
     TokenResponse,
 )
@@ -19,6 +21,7 @@ from app.schemas.settings_schema import ChangePasswordRequest, ProfileUpdateRequ
 from app.schemas.user import UserCreate, UserCreateResponse, UserResponse
 from app.services.audit_service import audit_log_service, login_history_service
 from app.services.auth_service import AuthService
+from app.services.totp_service import TOTPService
 from app.services.role_resolver import resolve_role
 
 logger = logging.getLogger(__name__)
@@ -186,6 +189,28 @@ async def login(
         )
 
     user_role_name = (user.role.role_name if user.role else "").upper()
+
+    # MFA enforcement when enabled via config flag
+    if settings.ENABLE_MFA and user_role_name in {"ADMIN", "SUPERADMIN", "ACCOUNTANT"}:
+        if user.mfa_enabled:
+            mfa_code = (
+                request.headers.get("X-MFA-Code") or request.headers.get("X-TOTP-Code")
+                if request
+                else None
+            )
+            if not mfa_code:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="MFA code required for privileged role. Provide via X-MFA-Code header.",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            if not TOTPService.verify_totp(user.mfa_secret or "", mfa_code):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid MFA code",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
 
     # Check maintenance mode (admin is ALWAYS allowed to login)
     if user_role_name != "ADMIN":
@@ -497,6 +522,70 @@ async def change_password(
     )
     await db.commit()
     return {"message": "Password changed successfully"}
+
+
+@router.post("/mfa/setup", response_model=MFASetupResponse)
+async def setup_mfa(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    secret = TOTPService.generate_secret()
+    current_user.mfa_secret = secret
+    current_user.mfa_enabled = False
+    db.add(current_user)
+    await db.commit()
+    otpauth_uri = TOTPService.get_provisioning_uri(
+        current_user.username or current_user.email, secret
+    )
+    return {
+        "secret": secret,
+        "otpauth_uri": otpauth_uri,
+    }
+
+
+@router.post("/mfa/enable")
+async def enable_mfa(
+    payload: MFAVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    if not current_user.mfa_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MFA is not set up. Call /auth/mfa/setup first.",
+        )
+    if not TOTPService.verify_totp(current_user.mfa_secret, payload.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid MFA verification code.",
+        )
+    current_user.mfa_enabled = True
+    db.add(current_user)
+    await db.commit()
+    return {"message": "MFA enabled successfully"}
+
+
+@router.post("/mfa/disable")
+async def disable_mfa(
+    payload: MFAVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    if not current_user.mfa_enabled or not current_user.mfa_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MFA is not currently enabled.",
+        )
+    if not TOTPService.verify_totp(current_user.mfa_secret, payload.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid MFA verification code.",
+        )
+    current_user.mfa_enabled = False
+    current_user.mfa_secret = None
+    db.add(current_user)
+    await db.commit()
+    return {"message": "MFA disabled successfully"}
 
 
 @router.get("/sessions")
