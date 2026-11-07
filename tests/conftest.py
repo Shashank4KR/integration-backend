@@ -18,6 +18,7 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 @pytest.fixture(autouse=True)
 def reset_rate_limits():
     """Ensure in-memory rate limits are cleared between tests for test isolation."""
+    RateLimitMiddleware.reset_all()
     cur = getattr(app, "middleware_stack", None)
     while cur is not None:
         if isinstance(cur, RateLimitMiddleware):
@@ -26,6 +27,7 @@ def reset_rate_limits():
             break
         cur = getattr(cur, "app", None)
     yield
+    RateLimitMiddleware.reset_all()
     cur = getattr(app, "middleware_stack", None)
     while cur is not None:
         if isinstance(cur, RateLimitMiddleware):

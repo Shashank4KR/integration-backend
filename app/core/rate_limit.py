@@ -10,6 +10,7 @@ from app.services.auth_service import AuthService
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
+    _instances: list["RateLimitMiddleware"] = []
     def __init__(
         self,
         app,
@@ -23,6 +24,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._requests: OrderedDict[str, deque[float]] = OrderedDict()
         self._max_clients = 10_000
         self._lock = Lock()
+        RateLimitMiddleware._instances.append(self)
+
+    @classmethod
+    def reset_all(cls) -> None:
+        """Reset in-memory rate limits across all middleware instances (for test isolation)."""
+        for inst in cls._instances:
+            with inst._lock:
+                inst._requests.clear()
 
     async def dispatch(self, request: Request, call_next):
         client_ip: str = request.client.host if request.client else "unknown"

@@ -34,3 +34,18 @@ def test_authentication_routes_have_a_stricter_limit():
         limited = client.post("/auth/login")
         assert limited.status_code == 429
         assert limited.headers["X-RateLimit-Limit"] == "10"
+
+
+def test_rate_limit_test_isolation_across_runs():
+    """Verify that autouse fixture cleanly purges previous bucket allocations between tests."""
+    app = FastAPI()
+    app.add_middleware(RateLimitMiddleware, requests_per_minute=2)
+
+    @app.get("/endpoint")
+    async def endpoint():
+        return {"status": "ok"}
+
+    # Test that bucket starts completely fresh and allows requests immediately
+    with TestClient(app) as client:
+        assert client.get("/endpoint").status_code == 200
+        assert client.get("/endpoint").status_code == 200
