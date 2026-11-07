@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from uuid import UUID
 
@@ -18,6 +19,9 @@ from app.services.auth_service import AuthService
 async def lifespan(app: FastAPI):
     yield
 
+
+
+logger = logging.getLogger("app.main")
 
 
 app = FastAPI(
@@ -144,9 +148,22 @@ async def audit_business_actions(request, call_next):
                     "details": f"{request.method} {request.url.path}",
                 },
             )
-    except Exception:
+    except Exception as exc:
         # Auditing must never turn a completed business action into a failed response.
-        pass
+        logger.error(
+            "Failed to record business audit log for %s %s: %s",
+            request.method,
+            request.url.path,
+            exc,
+            exc_info=True,
+            extra={
+                "user_id": str(user_id),
+                "activity": activity,
+                "path": request.url.path,
+                "method": request.method,
+                "error": str(exc),
+            },
+        )
     return response
 
 
