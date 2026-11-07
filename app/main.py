@@ -50,7 +50,8 @@ app.add_middleware(
 
 @app.middleware("http")
 async def limit_chapter_note_request_size(request, call_next):
-    if request.method != "POST" or request.url.path.rstrip("/") != "/chapter-notes/upload":
+    path = request.url.path.rstrip("/")
+    if request.method != "POST" or path not in {"/chapter-notes/upload", "/api/v1/chapter-notes/upload"}:
         return await call_next(request)
 
     max_request_size = 11 * 1024 * 1024
@@ -104,7 +105,10 @@ async def audit_business_actions(request, call_next):
     response = await call_next(request)
     if response.status_code >= 400 or request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
         return response
-    if request.url.path.startswith(("/login", "/logout", "/audit", "/login-history", "/audit-logs", "/auth/")):
+    if request.url.path.startswith(
+        ("/login", "/logout", "/audit", "/login-history", "/audit-logs", "/auth/",
+         "/api/v1/login", "/api/v1/logout", "/api/v1/audit", "/api/v1/login-history", "/api/v1/audit-logs", "/api/v1/auth/")
+    ):
         return response
     authorization = request.headers.get("authorization", "")
     if not authorization.lower().startswith("bearer "):
@@ -127,7 +131,7 @@ async def audit_business_actions(request, call_next):
         activity = "Approve Leave"
     elif "reject" in path and "leave" in path:
         activity = "Reject Leave"
-    elif path.startswith("/payments") and request.method == "POST":
+    elif (path.startswith("/payments") or path.startswith("/api/v1/payments")) and request.method == "POST":
         activity = "Fee Payment"
     elif "issue" in path and "book" in path and request.method == "POST":
         activity = "Book Issue"
@@ -173,9 +177,27 @@ async def audit_business_actions(request, call_next):
 
 
 # Mount all modular v1 routers
-app.include_router(api_router)
+# Compatibility rewrite middleware for legacy un-prefixed requests
+@app.middleware("http")
+async def v1_compatibility_rewrite(request, call_next):
+    path = request.url.path
+    if not path.startswith("/api/v1") and path not in {
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/docs/oauth2-redirect",
+        "/health",
+        "/ready",
+    }:
+        request.scope["path"] = f"/api/v1{path}"
+    return await call_next(request)
+
+
+# Mount all modular v1 routers under /api/v1
+app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/health")
+@app.get("/api/v1/health")
 async def health_check() -> dict:
     return {"status": "ok"}

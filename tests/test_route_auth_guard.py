@@ -5,11 +5,17 @@ from app.api.v1.auth.routes import get_current_user
 
 PUBLIC_ALLOWLIST = {
     ("GET", "/health"),
+    ("GET", "/api/v1/health"),
     ("POST", "/auth/login"),
     ("POST", "/login"),
     ("POST", "/auth/refresh"),
     ("POST", "/refresh"),
     ("GET", "/settings/public/system-status"),
+    ("POST", "/api/v1/auth/login"),
+    ("POST", "/api/v1/login"),
+    ("POST", "/api/v1/auth/refresh"),
+    ("POST", "/api/v1/refresh"),
+    ("GET", "/api/v1/settings/public/system-status"),
 }
 
 INTERNAL_DOCS_PATHS = {"/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"}
