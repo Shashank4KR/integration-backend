@@ -41,6 +41,9 @@ class User(Base):
     locked_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    token_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1"
+    )
     role_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("roles.id"), nullable=False
     )

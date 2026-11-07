@@ -89,3 +89,5 @@ from .school_model import School
 Faculty = Teacher
 StudentParent = ParentStudent
 
+
+from .refresh_token_model import RefreshToken

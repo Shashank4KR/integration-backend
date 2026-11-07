@@ -1,6 +1,8 @@
+import hashlib
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import bcrypt
 from jose import jwt
@@ -13,6 +15,7 @@ class AuthService:
     SECRET_KEY: str = settings.SECRET_KEY
     ALGORITHM: str = settings.ALGORITHM
     ACCESS_TOKEN_EXPIRE_MINUTES: int = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    REFRESH_TOKEN_EXPIRE_DAYS: int = settings.REFRESH_TOKEN_EXPIRE_DAYS
 
     @staticmethod
     def hash_password(password: str) -> str:
@@ -37,13 +40,25 @@ class AuthService:
         expires_delta: Optional[timedelta] = None,
     ) -> str:
         to_encode = data.copy()
-        expire = datetime.now(timezone.utc) + (
+        now = datetime.now(timezone.utc)
+        expire = now + (
             expires_delta
             if expires_delta is not None
             else timedelta(minutes=cls.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
-        to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
+        to_encode.setdefault("type", "access")
+        to_encode.update({"exp": expire, "iat": now})
         return jwt.encode(to_encode, cls.SECRET_KEY, algorithm=cls.ALGORITHM)
+
+    @classmethod
+    def create_refresh_token(cls) -> str:
+        """Generate a cryptographically secure random refresh token."""
+        return secrets.token_urlsafe(48)
+
+    @classmethod
+    def hash_token(cls, token: str) -> str:
+        """Hash a token with SHA-256 for secure indexed storage."""
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
     @classmethod
     def verify_token(cls, token: str) -> Optional[Dict[str, Any]]:
@@ -53,4 +68,4 @@ class AuthService:
             )
             return payload
         except JWTError:
-          return None
+            return None

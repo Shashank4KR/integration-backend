@@ -1,25 +1,36 @@
-from datetime import datetime, timedelta, timezone
 import logging
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.services.role_resolver import resolve_role
-from app.services.auth_service import AuthService
-from app.schemas.user import UserCreate, UserCreateResponse, UserResponse
-from app.schemas.settings_schema import ProfileUpdateRequest, ChangePasswordRequest
+from app.models.refresh_token_model import RefreshToken
 from app.models.user import User
+from app.schemas.auth_schema import (
+    RefreshTokenRequest,
+    TokenResponse,
+)
+from app.schemas.settings_schema import ChangePasswordRequest, ProfileUpdateRequest
+from app.schemas.user import UserCreate, UserCreateResponse, UserResponse
 from app.services.audit_service import audit_log_service, login_history_service
+from app.services.auth_service import AuthService
+from app.services.role_resolver import resolve_role
 
 logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 router = APIRouter()
+
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 async def get_current_user(
@@ -36,6 +47,9 @@ async def get_current_user(
     if payload is None:
         raise credentials_exception
 
+    if payload.get("type", "access") != "access":
+        raise credentials_exception
+
     user_id = payload.get("sub")
     if user_id is None:
         raise credentials_exception
@@ -50,10 +64,17 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
+    # Check token version to enforce revocation on logout / password change
+    token_ver = payload.get("ver")
+    if token_ver is not None and hasattr(user, "token_version") and user.token_version is not None:
+        if token_ver != user.token_version:
+            raise credentials_exception
+
     role_name = (user.role.role_name if user.role else "").upper()
     if role_name != "ADMIN":
         try:
             from app.services.settings_service import settings_service
+
             system_settings = await settings_service.get_category_settings(db, "system")
             if bool(system_settings.get("maintenance_mode", False)):
                 raise HTTPException(
@@ -134,7 +155,7 @@ async def login(
     # Check per-account lockout
     if user and user.locked_until:
         now_utc = datetime.now(timezone.utc)
-        if user.locked_until > now_utc:
+        if _ensure_utc(user.locked_until) > now_utc:
             remaining_mins = max(1, int((user.locked_until - now_utc).total_seconds() // 60) + 1)
             raise HTTPException(
                 status_code=status.HTTP_423_LOCKED,
@@ -164,11 +185,13 @@ async def login(
             detail="Inactive user",
         )
 
-    # Check maintenance mode (admin is ALWAYS allowed to login)
     user_role_name = (user.role.role_name if user.role else "").upper()
+
+    # Check maintenance mode (admin is ALWAYS allowed to login)
     if user_role_name != "ADMIN":
         try:
             from app.services.settings_service import settings_service
+
             system_settings = await settings_service.get_category_settings(db, "system")
             if bool(system_settings.get("maintenance_mode", False)):
                 raise HTTPException(
@@ -181,28 +204,145 @@ async def login(
             logger.warning(f"Error checking maintenance mode in login: {e}")
 
     # Reset failed login count and lockout on successful authentication
+    now_utc = datetime.now(timezone.utc)
     user.failed_login_attempts = 0
     user.locked_until = None
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = now_utc
     db.add(user)
 
-    login_record = await login_history_service.create_login_record(db, {
-        "user_id": user.id,
-        "device": request.headers.get("user-agent") if request else None,
-        "ip_address": request.client.host if request and request.client else None,
-    }, commit=False)
-    await audit_log_service.create_log(db, {
-        "user_id": user.id, "activity": "User Login", "details": "Successful login"
-    }, commit=False)
-    await db.commit()
+    login_record = await login_history_service.create_login_record(
+        db,
+        {
+            "user_id": user.id,
+            "device": request.headers.get("user-agent") if request else None,
+            "ip_address": request.client.host if request and request.client else None,
+        },
+        commit=False,
+    )
+    await audit_log_service.create_log(
+        db,
+        {"user_id": user.id, "activity": "User Login", "details": "Successful login"},
+        commit=False,
+    )
 
     access_token = AuthService.create_access_token(
-        data={"sub": str(user.id), "sid": str(login_record.id)},
+        data={
+            "sub": str(user.id),
+            "sid": str(login_record.id),
+            "ver": user.token_version or 1,
+            "type": "access",
+        },
         expires_delta=timedelta(minutes=AuthService.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
+    raw_refresh_token = AuthService.create_refresh_token()
+    refresh_record = RefreshToken(
+        user_id=user.id,
+        token_hash=AuthService.hash_token(raw_refresh_token),
+        expires_at=now_utc + timedelta(days=AuthService.REFRESH_TOKEN_EXPIRE_DAYS),
+        revoked=False,
+    )
+    db.add(refresh_record)
+    await db.commit()
+
     return {
         "access_token": access_token,
+        "refresh_token": raw_refresh_token,
+        "token_type": "bearer",
+        "must_change_password": bool(user.must_change_password),
+    }
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_access_token(
+    payload: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    now_utc = datetime.now(timezone.utc)
+    token_hash = AuthService.hash_token(payload.refresh_token)
+
+    result = await db.execute(
+        select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+    )
+    token_record = result.scalar_one_or_none()
+
+    if token_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Check for refresh token reuse
+    if token_record.revoked:
+        user_result = await db.execute(
+            select(User).where(User.id == token_record.user_id)
+        )
+        user = user_result.scalar_one_or_none()
+        if user:
+            user.token_version = (user.token_version or 1) + 1
+            db.add(user)
+        await db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.user_id == token_record.user_id)
+            .values(revoked=True)
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token reuse detected. All sessions revoked.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if _ensure_utc(token_record.expires_at) < now_utc:
+        token_record.revoked = True
+        db.add(token_record)
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Rotate refresh token: revoke used one and issue a new one
+    token_record.revoked = True
+    db.add(token_record)
+
+    user_result = await db.execute(
+        select(User).where(User.id == token_record.user_id)
+    )
+    user = user_result.scalar_one_or_none()
+    if user is None or not user.status:
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    new_raw_refresh = AuthService.create_refresh_token()
+    new_token_record = RefreshToken(
+        user_id=user.id,
+        token_hash=AuthService.hash_token(new_raw_refresh),
+        expires_at=now_utc + timedelta(days=AuthService.REFRESH_TOKEN_EXPIRE_DAYS),
+        revoked=False,
+    )
+    db.add(new_token_record)
+
+    new_access_token = AuthService.create_access_token(
+        data={
+            "sub": str(user.id),
+            "ver": user.token_version or 1,
+            "type": "access",
+        },
+        expires_delta=timedelta(minutes=AuthService.ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    await db.commit()
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_raw_refresh,
         "token_type": "bearer",
         "must_change_password": bool(user.must_change_password),
     }
@@ -221,7 +361,27 @@ async def logout(
             await login_history_service.update_logout_record(db, UUID(session_id), commit=False)
         except (ValueError, HTTPException) as e:
             logger.debug(f"Logout record update error: {e}")
-    await audit_log_service.create_log(db, {"user_id": current_user.id, "activity": "User Logout", "details": "User logged out"}, commit=False)
+
+    # Invalidate all active tokens for this user
+    current_user.token_version = (current_user.token_version or 1) + 1
+    db.add(current_user)
+
+    # Revoke all active refresh tokens for this user
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == current_user.id)
+        .values(revoked=True)
+    )
+
+    await audit_log_service.create_log(
+        db,
+        {
+            "user_id": current_user.id,
+            "activity": "User Logout",
+            "details": "User logged out; active tokens invalidated",
+        },
+        commit=False,
+    )
     await db.commit()
     return {"message": "Logged out successfully"}
 
@@ -271,7 +431,10 @@ async def update_profile(
     if payload.avatar_url is not None:
         new_avatar = payload.avatar_url
         if not (new_avatar.startswith(("data:image/", "http://", "https://", "/"))):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar must be a valid image URL or data URI")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Avatar must be a valid image URL or data URI",
+            )
         current_user.avatar_url = new_avatar
 
     db.add(current_user)
@@ -312,13 +475,23 @@ async def change_password(
 
     current_user.password_hash = AuthService.hash_password(new_password)
     current_user.must_change_password = False
+
+    # Invalidate all existing tokens on password change
+    current_user.token_version = (current_user.token_version or 1) + 1
     db.add(current_user)
+
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == current_user.id)
+        .values(revoked=True)
+    )
+
     await audit_log_service.create_log(
         db,
         {
             "user_id": current_user.id,
             "activity": "Password Changed",
-            "details": "User successfully changed their password",
+            "details": "User successfully changed their password; active sessions invalidated",
         },
         commit=False,
     )
@@ -343,4 +516,3 @@ async def get_my_sessions(
         }
         for record in history[:10]
     ]
-
