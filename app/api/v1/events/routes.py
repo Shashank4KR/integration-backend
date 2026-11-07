@@ -1,11 +1,20 @@
 from datetime import date
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.event_schema import AcademicCalendarCreate, AcademicCalendarResponse, AcademicCalendarUpdate, EventCreate, EventResponse, EventUpdate
+from app.schemas.event_schema import (
+    AcademicCalendarCreate,
+    AcademicCalendarResponse,
+    AcademicCalendarUpdate,
+    EventCreate,
+    EventResponse,
+    EventUpdate,
+)
 from app.services.event_service import academic_calendar_service, event_service
 
 event_router = APIRouter()

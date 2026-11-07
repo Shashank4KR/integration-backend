@@ -1,8 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from uuid import UUID
+
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.assignment_model import Assignment, AssignmentSubmission
 from app.models.student_model import Student
 from app.models.teacher_subject_model import TeacherSubject
@@ -23,8 +25,8 @@ class AssignmentService(CRUDService):
     async def _validate_assignment(self, session, data):
         due_date = data["due_date"]
         if due_date.tzinfo is None:
-            due_date = due_date.replace(tzinfo=timezone.utc)
-        if due_date <= datetime.now(timezone.utc):
+            due_date = due_date.replace(tzinfo=UTC)
+        if due_date <= datetime.now(UTC):
             raise HTTPException(status_code=400, detail="due_date must be in the future")
         assigned = (await session.execute(select(TeacherSubject).where(TeacherSubject.teacher_id == data["teacher_id"], TeacherSubject.class_id == data["class_id"], TeacherSubject.subject_id == data["subject_id"]))).scalar_one_or_none()
         if assigned is None:

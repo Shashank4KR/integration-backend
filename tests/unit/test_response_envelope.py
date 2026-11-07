@@ -1,5 +1,6 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 from app.main import app
 
 
@@ -20,7 +21,7 @@ async def test_response_envelope_structure_on_401_error():
         res = await client.get("/classes")
         assert res.status_code == 401
         body = res.json()
-        
+
         assert body["success"] is False
         assert body["data"] is None
         assert isinstance(body["error"], dict)
@@ -40,7 +41,7 @@ async def test_response_envelope_structure_on_validation_error():
         res = await client.post("/auth/login", json={"invalid": "payload"})
         assert res.status_code == 422
         body = res.json()
-        
+
         assert body["success"] is False
         assert body["data"] is None
         assert isinstance(body["error"], dict)

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.timetable_model import Timetable
 from app.repositories.timetable_repository import timetable_repository
-from app.services.crud_service import CRUDService, TIMETABLE_FKS
+from app.services.crud_service import TIMETABLE_FKS, CRUDService
 
 
 class TimetableService(CRUDService):

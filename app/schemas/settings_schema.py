@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Any
 from uuid import UUID
+
 from pydantic import ConfigDict, EmailStr, Field, model_validator
+
 from app.schemas.base import BaseSchema, ResponseSchema
 
 

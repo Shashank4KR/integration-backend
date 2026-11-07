@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.role import Role
 
-
 ROLE_CODE_TO_NAME = {
     "0001": "ADMIN",
     "0002": "TEACHER",

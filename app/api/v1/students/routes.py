@@ -1,4 +1,4 @@
-from app.schemas.assignment_schema import StudentAssignmentSubmissionRequest
+from datetime import UTC
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -6,8 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
-from app.api.v1.router_factory import require_roles
-from app.api.v1.router_factory import build_crud_router
+from app.api.v1.router_factory import build_crud_router, require_roles
 from app.core.database import get_db
 from app.models.exam_result_model import ExamResult
 from app.models.parent_model import Parent
@@ -15,12 +14,13 @@ from app.models.parent_student_model import ParentStudent
 from app.models.student_model import Student
 from app.models.timetable_model import Timetable
 from app.models.user import User
-from app.schemas.student_schema import StudentCreate, StudentResponse, StudentUpdate
+from app.schemas.assignment_schema import StudentAssignmentSubmissionRequest
 from app.schemas.exam_schema import (
     ExamResultResponse,
     ReportCardResponse,
     StudentPerformanceSummary,
 )
+from app.schemas.student_schema import StudentCreate, StudentResponse, StudentUpdate
 from app.services.ownership_service import check_student_ownership
 from app.services.report_card_service import report_card_service
 from app.services.student_service import student_service
@@ -359,8 +359,9 @@ async def submit_assignment_for_me(
     student: Student = Depends(get_current_student),
     session: AsyncSession = Depends(get_db),
 ):
-    from app.models.assignment_model import AssignmentSubmission
     from datetime import datetime, timezone
+
+    from app.models.assignment_model import AssignmentSubmission
 
     assignment_id = payload.assignment_id
     file_path = payload.file_path
@@ -374,7 +375,7 @@ async def submit_assignment_for_me(
     existing = res.scalar_one_or_none()
     if existing:
         existing.file_path = file_path
-        existing.submitted_on = datetime.now(timezone.utc)
+        existing.submitted_on = datetime.now(UTC)
         await session.commit()
         await session.refresh(existing)
         sub = existing
@@ -383,7 +384,7 @@ async def submit_assignment_for_me(
             assignment_id=assignment_id,
             student_id=student.id,
             file_path=file_path,
-            submitted_on=datetime.now(timezone.utc),
+            submitted_on=datetime.now(UTC),
         )
         session.add(sub)
         await session.commit()
@@ -406,7 +407,7 @@ async def get_current_student_fees(
     student: Student = Depends(get_current_student),
     session: AsyncSession = Depends(get_db),
 ):
-    from app.services.fee_service import fee_invoice_service, payment_service, _invoice_total_paid
+    from app.services.fee_service import _invoice_total_paid, fee_invoice_service, payment_service
 
     summary = await fee_invoice_service.get_student_fee_summary(session, student.id)
     invoices = await fee_invoice_service.get_by_student(session, student.id)
@@ -455,7 +456,7 @@ async def get_student_fee_invoices(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from app.services.fee_service import fee_invoice_service, _invoice_total_paid
+    from app.services.fee_service import _invoice_total_paid, fee_invoice_service
     invoices = await fee_invoice_service.get_by_student(session, student_id)
     result = []
     for inv in invoices:
@@ -531,7 +532,14 @@ async def get_current_student_library(
     student: Student = Depends(get_current_student),
     session: AsyncSession = Depends(get_db),
 ):
-    from app.models.library_model import BookIssue, BookReservation, FinePayment, BookIssueStatus, ReservationStatus, FinePaymentStatus
+    from app.models.library_model import (
+        BookIssue,
+        BookIssueStatus,
+        BookReservation,
+        FinePayment,
+        FinePaymentStatus,
+        ReservationStatus,
+    )
     issues_result = await session.execute(
         select(BookIssue).where(BookIssue.student_id == student.id)
     )

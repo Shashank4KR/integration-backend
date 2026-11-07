@@ -3,27 +3,28 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from app.schemas.base import BaseSchema
 
 
 class SubjectCreate(BaseSchema):
     subject_code: str = Field(..., min_length=1, max_length=50)
     subject_name: str = Field(..., min_length=1, max_length=255)
-    department_id: Optional[UUID] = None
-    subject_type: Optional[str] = Field(default="THEORY", max_length=50)
-    credits: Optional[int] = Field(default=3, ge=0, le=20)
-    periods_per_week: Optional[int] = Field(default=4, ge=0, le=40)
-    status: Optional[str] = Field(default="ACTIVE", max_length=20)
+    department_id: UUID | None = None
+    subject_type: str | None = Field(default="THEORY", max_length=50)
+    credits: int | None = Field(default=3, ge=0, le=20)
+    periods_per_week: int | None = Field(default=4, ge=0, le=40)
+    status: str | None = Field(default="ACTIVE", max_length=20)
 
 
 class SubjectUpdate(BaseSchema):
-    subject_code: Optional[str] = Field(None, min_length=1, max_length=50)
-    subject_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    department_id: Optional[UUID] = None
-    subject_type: Optional[str] = Field(default=None, max_length=50)
-    credits: Optional[int] = Field(default=None, ge=0, le=20)
-    periods_per_week: Optional[int] = Field(default=None, ge=0, le=40)
-    status: Optional[str] = Field(default=None, max_length=20)
+    subject_code: str | None = Field(None, min_length=1, max_length=50)
+    subject_name: str | None = Field(None, min_length=1, max_length=255)
+    department_id: UUID | None = None
+    subject_type: str | None = Field(default=None, max_length=50)
+    credits: int | None = Field(default=None, ge=0, le=20)
+    periods_per_week: int | None = Field(default=None, ge=0, le=40)
+    status: str | None = Field(default=None, max_length=20)
 
 
 class SubjectResponse(BaseModel):
@@ -32,10 +33,10 @@ class SubjectResponse(BaseModel):
     id: UUID
     subject_code: str
     subject_name: str
-    department_id: Optional[UUID] = None
-    subject_type: Optional[str] = "THEORY"
-    credits: Optional[int] = 3
-    periods_per_week: Optional[int] = 4
-    status: Optional[str] = "ACTIVE"
+    department_id: UUID | None = None
+    subject_type: str | None = "THEORY"
+    credits: int | None = 3
+    periods_per_week: int | None = 4
+    status: str | None = "ACTIVE"
     created_at: datetime
     updated_at: datetime

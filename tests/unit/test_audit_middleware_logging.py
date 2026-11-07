@@ -1,7 +1,8 @@
 import logging
 import uuid
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from starlette.testclient import TestClient
 
 from app.main import app
@@ -31,8 +32,9 @@ def test_audit_middleware_logs_exception_on_failure(caplog):
 
 @pytest.mark.asyncio
 async def test_audit_business_actions_logs_error_without_raising(caplog):
-    from app.main import audit_business_actions
     from unittest.mock import MagicMock
+
+    from app.main import audit_business_actions
 
     user_id = uuid.uuid4()
     token = AuthService.create_access_token({"sub": str(user_id), "sid": str(uuid.uuid4())})

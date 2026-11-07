@@ -2,8 +2,8 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
-from pydantic import ValidationError
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.schemas.marks_converter_schema import BoardDirection, MarksConversionRequest
 from app.services.marks_converter_service import calculate_marks

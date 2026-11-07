@@ -3,7 +3,14 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.hostel_model import HostelAllocation, HostelAllocationStatus, HostelBed, HostelBedStatus, HostelBlock, HostelRoom
+from app.models.hostel_model import (
+    HostelAllocation,
+    HostelAllocationStatus,
+    HostelBed,
+    HostelBedStatus,
+    HostelBlock,
+    HostelRoom,
+)
 from app.repositories.crud_repository import CRUDRepository
 
 

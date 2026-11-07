@@ -1,10 +1,20 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.assignment_schema import AssignmentCreate, AssignmentResponse, AssignmentSubmissionCreate, AssignmentSubmissionResponse, AssignmentSubmissionUpdate, AssignmentSummaryResponse, AssignmentUpdate
+from app.schemas.assignment_schema import (
+    AssignmentCreate,
+    AssignmentResponse,
+    AssignmentSubmissionCreate,
+    AssignmentSubmissionResponse,
+    AssignmentSubmissionUpdate,
+    AssignmentSummaryResponse,
+    AssignmentUpdate,
+)
 from app.services.assignment_service import assignment_service, submission_service
 from app.services.ownership_service import check_student_ownership, check_teacher_ownership
 
@@ -60,8 +70,9 @@ async def _resolve_authenticated_student_id(session: AsyncSession, current_user:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only students can submit assignments",
         )
-    from app.models.student_model import Student
     from sqlalchemy import select
+
+    from app.models.student_model import Student
     student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
     student = student_res.scalar_one_or_none()
     if not student:

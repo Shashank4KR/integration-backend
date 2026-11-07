@@ -10,6 +10,8 @@ from app.api.v1.academics import (
 )
 from app.api.v1.admissions import (
     application_router as admission_application_router,
+)
+from app.api.v1.admissions import (
     document_router as admission_document_router,
 )
 from app.api.v1.ai_analytics import (
@@ -19,10 +21,12 @@ from app.api.v1.ai_analytics import (
 )
 from app.api.v1.assignments import (
     class_assignment_router,
-    router as assignment_router,
     student_assignment_router,
     submission_router,
     teacher_assignment_router,
+)
+from app.api.v1.assignments import (
+    router as assignment_router,
 )
 from app.api.v1.attendance import router as attendance_router
 from app.api.v1.audit import (
@@ -98,10 +102,12 @@ from app.api.v1.library import (
     reservation_router,
     student_library_router,
 )
+from app.api.v1.marks_converter import router as marks_converter_router
 from app.api.v1.parents import (
     parent_router,
     parent_student_router,
 )
+from app.api.v1.roles import permission_router, role_router
 from app.api.v1.settings import settings_router
 from app.api.v1.students import router as student_router
 from app.api.v1.teachers import (
@@ -119,8 +125,6 @@ from app.api.v1.users import (
     admin_router,
     user_router,
 )
-from app.api.v1.roles import permission_router, role_router
-from app.api.v1.marks_converter import router as marks_converter_router
 
 api_router = APIRouter()
 

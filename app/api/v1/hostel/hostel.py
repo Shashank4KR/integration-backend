@@ -8,7 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
-from app.models.hostel_model import HostelAllocation, HostelAllocationStatus, HostelBed, HostelBedStatus, HostelBlock, HostelRoom
+from app.models.hostel_model import (
+    HostelAllocation,
+    HostelAllocationStatus,
+    HostelBed,
+    HostelBedStatus,
+    HostelBlock,
+    HostelRoom,
+)
 from app.models.student_model import Student
 from app.models.user import User
 from app.schemas.hostel_schema import (
@@ -28,7 +35,12 @@ from app.schemas.hostel_schema import (
 )
 from app.services.audit_service import audit_log_service
 from app.services.communication_service import notification_service
-from app.services.hostel_service import hostel_allocation_service, hostel_bed_service, hostel_block_service, hostel_room_service
+from app.services.hostel_service import (
+    hostel_allocation_service,
+    hostel_bed_service,
+    hostel_block_service,
+    hostel_room_service,
+)
 from app.services.ownership_service import check_student_ownership
 
 logger = logging.getLogger(__name__)

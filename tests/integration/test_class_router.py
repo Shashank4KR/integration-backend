@@ -1,4 +1,5 @@
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -7,11 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.main import app
-from app.models.role import Role
-from app.models.user import User
 from app.models.class_model import Class
-from app.models.subject_model import Subject
 from app.models.class_subject_model import ClassSubject
+from app.models.role import Role
+from app.models.subject_model import Subject
+from app.models.user import User
+
 
 async def _override_current_user(user: User):
     async def _dependency() -> User:

@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.fee_model import FeeInvoice, FeeStructure, Payment
 from app.models.finance_model import (
     Expense,
     ExpenseCategory,
@@ -19,7 +20,6 @@ from app.models.finance_model import (
     StudentLedger,
     StudentScholarship,
 )
-from app.models.fee_model import FeeInvoice, FeeStructure, Payment
 from app.repositories.crud_repository import CRUDRepository
 
 

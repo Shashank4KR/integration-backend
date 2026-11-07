@@ -1,17 +1,31 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from app.services.idempotency_service import IdempotencyService
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
+
 from app.api.v1.auth.routes import get_current_user
+from app.core.database import get_db
+from app.models.fee_model import FeeInvoice, Payment
 from app.models.parent_model import Parent
 from app.models.parent_student_model import ParentStudent
 from app.models.student_model import Student
-from app.models.fee_model import FeeInvoice, Payment
 from app.models.user import User
-from app.schemas.fee_schema import FeeInvoiceCreate, FeeInvoiceResponse, FeeInvoiceUpdate, FeeStructureCreate, FeeStructureResponse, FeeStructureUpdate, FeeSummaryResponse, PaymentCreate, PaymentResponse, PaymentUpdate
+from app.schemas.fee_schema import (
+    FeeInvoiceCreate,
+    FeeInvoiceResponse,
+    FeeInvoiceUpdate,
+    FeeStructureCreate,
+    FeeStructureResponse,
+    FeeStructureUpdate,
+    FeeSummaryResponse,
+    PaymentCreate,
+    PaymentResponse,
+    PaymentUpdate,
+)
 from app.services.fee_service import fee_invoice_service, fee_structure_service, payment_service
+from app.services.idempotency_service import IdempotencyService
+
 
 def _ensure_admin_or_accountant(current_user: User) -> None:
     if current_user.role.role_name not in ("ADMIN", "ACCOUNTANT"):
@@ -57,7 +71,7 @@ async def get_fee_summary(
     current_user: User = Depends(get_current_user),
 ):
     _ensure_admin_or_accountant(current_user)
-    from app.models.fee_model import FeeInvoice, Payment
+    from app.models.fee_model import FeeInvoice
     total_invoiced = await session.scalar(select(func.coalesce(func.sum(FeeInvoice.amount), 0))) or 0
     total_paid = await session.scalar(select(func.coalesce(func.sum(Payment.amount_paid), 0))) or 0
     pending = total_invoiced - total_paid

@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth.routes import get_current_user
 from app.api.v1.router_factory import build_crud_router
 from app.core.database import get_db
-from app.models.class_subject_model import ClassSubject
 from app.models.class_model import Class
+from app.models.class_subject_model import ClassSubject
 from app.models.exam_model import Exam
 from app.models.exam_result_model import ExamResult
 from app.models.subject_model import Subject
@@ -95,8 +95,8 @@ async def get_class_teachers(
     return await class_service.get_class_teachers(session, class_id)
 
 
-from app.schemas.student import StudentResponse
 from app.models.student_model import Student
+from app.schemas.student import StudentResponse
 
 
 @router.get("/{class_id}/students", response_model=list[StudentResponse])

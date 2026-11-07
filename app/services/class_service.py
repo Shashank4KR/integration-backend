@@ -1,17 +1,19 @@
 from typing import Any
 from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.repositories.class_repository import class_repository
-from app.services.crud_service import CLASS_FKS, CRUDService
 from app.models.class_subject_model import ClassSubject
-from app.models.teacher_subject_model import TeacherSubject
-from app.models.timetable_model import Timetable
-from app.models.exam_result_model import ExamResult
 from app.models.exam_model import Exam
+from app.models.exam_result_model import ExamResult
 from app.models.subject_model import Subject
 from app.models.teacher_model import Teacher
+from app.models.teacher_subject_model import TeacherSubject
+from app.models.timetable_model import Timetable
+from app.repositories.class_repository import class_repository
+from app.services.crud_service import CLASS_FKS, CRUDService
+
 
 class ClassService(CRUDService):
     async def get_class_subjects(self, session: AsyncSession, class_id: UUID) -> list[Subject]:

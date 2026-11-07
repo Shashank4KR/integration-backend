@@ -1,8 +1,9 @@
 import json
-from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
-from typing import AsyncGenerator
 import uuid
+from collections.abc import AsyncGenerator
+from datetime import UTC, date, datetime, timedelta, timezone
+from decimal import Decimal
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -583,7 +584,7 @@ async def test_teacher_only_attendance_and_marks_entry(
         period_no=2,
         status=AttendanceStatus.PRESENT,
         marked_by=teacher_assigned_user.id,
-        created_at=datetime.now(timezone.utc) - timedelta(hours=25),
+        created_at=datetime.now(UTC) - timedelta(hours=25),
     )
     db_session.add(expired_att)
     await db_session.commit()
@@ -594,7 +595,7 @@ async def test_teacher_only_attendance_and_marks_entry(
 
     # Expire the exam result created 73 hours ago
     expired_result = await db_session.get(ExamResult, uuid.UUID(marks_id))
-    expired_result.created_at = datetime.now(timezone.utc) - timedelta(hours=73)
+    expired_result.created_at = datetime.now(UTC) - timedelta(hours=73)
     await db_session.commit()
 
     resp_expired_marks = await async_client.put(f"/exam-results/{marks_id}", json={"marks_obtained": 95.0})

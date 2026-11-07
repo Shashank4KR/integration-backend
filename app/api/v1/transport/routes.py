@@ -4,20 +4,34 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.core.exceptions import APIException, success_response
-from app.api.v1.auth.routes import get_current_user
 from app.models.transport_model import Bus, Driver, Route, StudentTransport
 from app.models.user import User
 from app.schemas.transport_schema import (
-    BusCreate, BusResponse, BusUpdate, DriverCreate, DriverResponse, DriverUpdate,
-    RouteCreate, RouteResponse, RouteUpdate, StudentTransportCreate, StudentTransportResponse, StudentTransportUpdate,
-)
-from app.services.transport_service import (
-    bus_service, driver_service, route_service, student_transport_service,
-    transport_summary,
+    BusCreate,
+    BusResponse,
+    BusUpdate,
+    DriverCreate,
+    DriverResponse,
+    DriverUpdate,
+    RouteCreate,
+    RouteResponse,
+    RouteUpdate,
+    StudentTransportCreate,
+    StudentTransportResponse,
+    StudentTransportUpdate,
 )
 from app.services.ownership_service import check_student_ownership
+from app.services.transport_service import (
+    bus_service,
+    driver_service,
+    route_service,
+    student_transport_service,
+    transport_summary,
+)
 
 
 def _ensure_admin(current_user: User) -> None:

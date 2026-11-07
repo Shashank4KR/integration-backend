@@ -5,10 +5,23 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.hostel_model import HostelAllocation, HostelAllocationStatus, HostelBed, HostelBedStatus, HostelBlock, HostelRoom, HostelRoomStatus
+from app.models.hostel_model import (
+    HostelAllocation,
+    HostelAllocationStatus,
+    HostelBed,
+    HostelBedStatus,
+    HostelBlock,
+    HostelRoom,
+    HostelRoomStatus,
+)
 from app.models.student_model import Student
 from app.models.user import User
-from app.repositories.hostel_repository import hostel_allocation_repository, hostel_bed_repository, hostel_block_repository, hostel_room_repository
+from app.repositories.hostel_repository import (
+    hostel_allocation_repository,
+    hostel_bed_repository,
+    hostel_block_repository,
+    hostel_room_repository,
+)
 from app.services.crud_service import CRUDService
 
 

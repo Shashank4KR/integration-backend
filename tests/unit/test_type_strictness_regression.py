@@ -1,10 +1,13 @@
-import pytest
-from httpx import AsyncClient, ASGITransport
 from uuid import uuid4
-from app.main import app
-from app.models.user import User
-from app.models.role import Role
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
 from app.api.v1.auth.routes import get_current_user
+from app.main import app
+from app.models.role import Role
+from app.models.user import User
+
 
 @pytest.fixture(autouse=True)
 def reset_rate_limit():

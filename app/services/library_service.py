@@ -1,6 +1,6 @@
+import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-import logging
 from uuid import UUID
 
 logger = logging.getLogger(__name__)

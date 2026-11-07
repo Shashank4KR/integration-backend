@@ -1,9 +1,9 @@
-from collections import Counter
-from datetime import date
 import re
 import secrets
 import string
 import uuid
+from collections import Counter
+from datetime import date
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
+
 
 def _generate_temporary_password(length: int = 12) -> str:
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*"

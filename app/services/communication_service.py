@@ -1,8 +1,14 @@
 from uuid import UUID
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.user import User
-from app.repositories.communication_repository import announcement_repository, message_repository, notification_repository
+from app.repositories.communication_repository import (
+    announcement_repository,
+    message_repository,
+    notification_repository,
+)
 from app.services.crud_service import CRUDService
 
 AUDIENCES = {"ALL", "STUDENTS", "TEACHERS", "PARENTS", "ADMINS"}
@@ -30,8 +36,9 @@ class NotificationService(CRUDService):
         return await super().create(session, data)
     async def mark_as_read(self, session, item_id): return await self.update(session, item_id, {"is_read": True})
     async def mark_all_as_read(self, session, user_id):
-        from app.models.communication_model import Notification
         from sqlalchemy import update
+
+        from app.models.communication_model import Notification
         await session.execute(
             update(Notification).where(Notification.user_id == user_id, Notification.is_read == False).values(is_read=True)
         )
@@ -55,8 +62,9 @@ class MessageService(CRUDService):
     async def send_message(self, session, data): return await self.create(session, data)
     async def mark_as_read(self, session, item_id): return await self.update(session, item_id, {"is_read": True})
     async def mark_all_as_read(self, session, user_id):
-        from app.models.communication_model import Message
         from sqlalchemy import update
+
+        from app.models.communication_model import Message
         await session.execute(
             update(Message).where(Message.receiver_id == user_id, Message.is_read == False).values(is_read=True)
         )

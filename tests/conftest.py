@@ -1,5 +1,5 @@
 import asyncio
-from typing import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 import pytest_asyncio
@@ -11,7 +11,6 @@ from sqlalchemy.pool import StaticPool
 from app.core.database import Base, get_db
 from app.core.rate_limit import RateLimitMiddleware
 from app.main import app
-
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 

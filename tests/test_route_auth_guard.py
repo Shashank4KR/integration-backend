@@ -1,7 +1,8 @@
 import pytest
 from fastapi.routing import APIRoute
-from app.main import app
+
 from app.api.v1.auth.routes import get_current_user
+from app.main import app
 
 PUBLIC_ALLOWLIST = {
     ("GET", "/health"),

@@ -43,6 +43,7 @@ async def list_report_cards(
     current_user: User = Depends(get_current_user),
 ):
     from sqlalchemy import select
+
     from app.models.report_card_model import ReportCard
     from app.models.student_model import Student
 
@@ -79,6 +80,7 @@ async def publish_exam_results(
     _ensure_admin(current_user)
     from fastapi import HTTPException
     from sqlalchemy import select
+
     from app.models.exam_model import Exam
     from app.models.student_model import Student
 

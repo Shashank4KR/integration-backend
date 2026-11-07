@@ -1,5 +1,3 @@
-from app.api.v1.api import api_router
-
 # Domain re-exports for clean package-level access
 from app.api.v1.academics import (
     academic_content_router,
@@ -15,12 +13,15 @@ from app.api.v1.ai_analytics import (
     ai_chat_history_router,
     user_chat_history_router,
 )
+from app.api.v1.api import api_router
 from app.api.v1.assignments import (
     class_assignment_router,
-    router as assignment_router,
     student_assignment_router,
     submission_router,
     teacher_assignment_router,
+)
+from app.api.v1.assignments import (
+    router as assignment_router,
 )
 from app.api.v1.attendance import router as attendance_router
 from app.api.v1.audit import (
@@ -32,6 +33,8 @@ from app.api.v1.audit import (
 from app.api.v1.auth import (
     get_current_user,
     oauth2_scheme,
+)
+from app.api.v1.auth import (
     router as auth_router,
 )
 from app.api.v1.communication import (

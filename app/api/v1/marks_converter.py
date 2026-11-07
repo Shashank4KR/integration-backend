@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -156,7 +156,7 @@ async def create_rule(
         data["reference_url"] = str(data["reference_url"])
     if data["is_official"]:
         data["verified_by_id"] = current_user.id
-        data["verified_at"] = datetime.now(timezone.utc)
+        data["verified_at"] = datetime.now(UTC)
     data["created_by_id"] = current_user.id
     data["state"] = data["state"].strip()
     data["class_grade"] = data["class_grade"].strip()
@@ -192,7 +192,7 @@ async def update_rule(
         changes["reference_url"] = str(changes["reference_url"])
     if "is_official" in changes:
         changes["verified_by_id"] = current_user.id if next_is_official else None
-        changes["verified_at"] = datetime.now(timezone.utc) if next_is_official else None
+        changes["verified_at"] = datetime.now(UTC) if next_is_official else None
     elif next_is_official and any(
         key in changes
         for key in (
@@ -210,7 +210,7 @@ async def update_rule(
         )
     ):
         changes["verified_by_id"] = current_user.id
-        changes["verified_at"] = datetime.now(timezone.utc)
+        changes["verified_at"] = datetime.now(UTC)
     for key in ("state", "class_grade", "exam_type", "academic_year"):
         if key in changes and changes[key] is not None:
             changes[key] = changes[key].strip()

@@ -9,10 +9,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.admin_model import Admin
+    from app.models.ai_analytics_model import AIChatHistory
     from app.models.attendance_model import Attendance
     from app.models.audit_model import AuditLog, LoginHistory
-    from app.models.ai_analytics_model import AIChatHistory
-    from app.models.admin_model import Admin
     from app.models.parent_model import Parent
     from app.models.role import Role
     from app.models.student_model import Student

@@ -39,10 +39,10 @@ from app.repositories.finance_repository import (
     other_income_repository,
     refund_request_repository,
     salary_repository,
+    scholarship_type_repository,
     student_category_repository,
     student_fee_assignment_repository,
     student_ledger_repository,
-    scholarship_type_repository,
     student_scholarship_repository,
 )
 from app.services.crud_service import CRUDService
@@ -577,14 +577,14 @@ class FinanceService:
         total = await payment_repository.total_paid(session, start_date=start, end_date=end)
         payments = await payment_repository.get_by_date_range(session, start, end)
         by_method: dict[str, float] = {}
-        
+
         MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         monthly_totals = {m: Decimal("0.00") for m in MONTH_NAMES}
 
         for p in payments:
             method_key = p.payment_method or "Other"
             by_method[method_key] = by_method.get(method_key, 0.0) + float(p.amount_paid)
-            
+
             p_date = p.payment_date or (p.created_at.date() if p.created_at else None)
             if p_date:
                 m_name = MONTH_NAMES[p_date.month - 1]
@@ -907,7 +907,7 @@ class FinanceService:
     async def get_report_library_fine(
         self, session: AsyncSession, start_date: date | None = None, end_date: date | None = None
     ) -> dict:
-        from app.models.library_model import FinePayment, BookIssue
+        from app.models.library_model import BookIssue, FinePayment
 
         query = (
             select(FinePayment, BookIssue, Student)
@@ -969,8 +969,8 @@ class FinanceService:
     async def get_report_transport_fee(
         self, session: AsyncSession, start_date: date | None = None, end_date: date | None = None
     ) -> dict:
-        from app.models.transport_model import StudentTransport
         from app.models.student_model import Student
+        from app.models.transport_model import StudentTransport
 
         students_transport = await session.execute(select(StudentTransport))
         total_students = len(students_transport.scalars().all())

@@ -12,15 +12,15 @@ class AdmissionApplicationCreate(BaseModel):
     applied_class: UUID
     application_date: date
     status: AdmissionApplicationStatus = AdmissionApplicationStatus.PENDING
-    remarks: Optional[str] = None
+    remarks: str | None = None
 
 
 class AdmissionApplicationUpdate(BaseModel):
-    applicant_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    applied_class: Optional[UUID] = None
-    application_date: Optional[date] = None
-    status: Optional[AdmissionApplicationStatus] = None
-    remarks: Optional[str] = None
+    applicant_name: str | None = Field(None, min_length=1, max_length=255)
+    applied_class: UUID | None = None
+    application_date: date | None = None
+    status: AdmissionApplicationStatus | None = None
+    remarks: str | None = None
 
 
 class AdmissionApplicationResponse(BaseModel):
@@ -31,7 +31,7 @@ class AdmissionApplicationResponse(BaseModel):
     applied_class: UUID
     application_date: date
     status: AdmissionApplicationStatus
-    remarks: Optional[str] = None
+    remarks: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -41,16 +41,16 @@ class AdmissionDocumentCreate(BaseModel):
     document_type: str = Field(..., min_length=1, max_length=100)
     file_path: str = Field(..., min_length=1, max_length=500)
     verified: bool = False
-    verified_by: Optional[UUID] = None
-    verified_date: Optional[date] = None
+    verified_by: UUID | None = None
+    verified_date: date | None = None
 
 
 class AdmissionDocumentUpdate(BaseModel):
-    document_type: Optional[str] = Field(None, min_length=1, max_length=100)
-    file_path: Optional[str] = Field(None, min_length=1, max_length=500)
-    verified: Optional[bool] = None
-    verified_by: Optional[UUID] = None
-    verified_date: Optional[date] = None
+    document_type: str | None = Field(None, min_length=1, max_length=100)
+    file_path: str | None = Field(None, min_length=1, max_length=500)
+    verified: bool | None = None
+    verified_by: UUID | None = None
+    verified_date: date | None = None
 
 
 class AdmissionDocumentVerify(BaseModel):
@@ -66,8 +66,8 @@ class AdmissionDocumentResponse(BaseModel):
     document_type: str
     file_path: str
     verified: bool
-    verified_by: Optional[UUID] = None
-    verified_date: Optional[date] = None
+    verified_by: UUID | None = None
+    verified_date: date | None = None
     created_at: datetime
     updated_at: datetime
 

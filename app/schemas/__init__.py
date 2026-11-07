@@ -1,34 +1,31 @@
 from app.schemas.academic_content_schema import (
-    LessonPlanCreate,
-    LessonPlanUpdate,
-    LessonPlanResponse,
-    ContentResourceCreate,
-    ContentResourceUpdate,
-    ContentResourceResponse,
     ChapterNoteCreate,
-    ChapterNoteUpdate,
     ChapterNoteResponse,
+    ChapterNoteUpdate,
+    ContentResourceCreate,
+    ContentResourceResponse,
+    ContentResourceUpdate,
+    LessonPlanCreate,
+    LessonPlanResponse,
+    LessonPlanUpdate,
     StudentFeedbackCreate,
-    StudentFeedbackUpdate,
     StudentFeedbackResponse,
+    StudentFeedbackUpdate,
 )
-
-from app.schemas.student import (
-    StudentCreate,
-    StudentUpdate,
-    StudentResponse,
-)
-
-from app.schemas.parent import (
-    ParentCreate,
-    ParentUpdate,
-    ParentResponse,
-)
-
 from app.schemas.faculty import (
     FacultyCreate,
-    FacultyUpdate,
     FacultyResponse,
+    FacultyUpdate,
+)
+from app.schemas.parent import (
+    ParentCreate,
+    ParentResponse,
+    ParentUpdate,
+)
+from app.schemas.student import (
+    StudentCreate,
+    StudentResponse,
+    StudentUpdate,
 )
 
 __all__ = [

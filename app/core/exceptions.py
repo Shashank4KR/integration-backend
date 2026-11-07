@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any, Generic, TypeVar
 
 from fastapi import Request, status
@@ -29,7 +29,7 @@ def success_response(
     meta: dict[str, Any] | None = None,
 ) -> dict:
     resolved_meta = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "requestId": get_request_id(),
     }
     if meta:
@@ -69,7 +69,7 @@ def _error_response(
     errors: list[str] | None = None,
 ) -> JSONResponse:
     meta = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "requestId": get_request_id(),
     }
     error_payload = {
@@ -147,7 +147,7 @@ class ResponseEnvelopeMiddleware(BaseHTTPMiddleware):
             )
 
         req_id = get_request_id()
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         meta = {
             "timestamp": now_iso,
             "requestId": req_id,

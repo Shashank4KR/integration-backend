@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -115,11 +115,11 @@ async def _ensure_exam_covers_subject_and_class(
 
 
 def _check_marks_correction_window(result: ExamResult) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     created = result.created_at
     if created is not None:
         if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
+            created = created.replace(tzinfo=UTC)
         cutoff = created + timedelta(hours=settings.MARKS_CORRECTION_WINDOW_HOURS)
         if now > cutoff:
             raise HTTPException(

@@ -1,6 +1,8 @@
-import pytest
 from datetime import datetime
+
+import pytest
 from sqlalchemy import DateTime
+
 from app.models.marks_converter_model import MarksConversionHistory
 
 

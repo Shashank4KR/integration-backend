@@ -1,7 +1,7 @@
 import hashlib
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import bcrypt
@@ -36,11 +36,11 @@ class AuthService:
     @classmethod
     def create_access_token(
         cls,
-        data: Dict[str, Any],
-        expires_delta: Optional[timedelta] = None,
+        data: dict[str, Any],
+        expires_delta: timedelta | None = None,
     ) -> str:
         to_encode = data.copy()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expire = now + (
             expires_delta
             if expires_delta is not None
@@ -61,7 +61,7 @@ class AuthService:
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
     @classmethod
-    def verify_token(cls, token: str) -> Optional[Dict[str, Any]]:
+    def verify_token(cls, token: str) -> dict[str, Any] | None:
         try:
             payload = jwt.decode(
                 token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM]

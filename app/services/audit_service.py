@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -15,7 +15,7 @@ class LoginHistoryService:
         if await session.get(User, data["user_id"]) is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User must exist")
         if data.get("login_time") is None:
-            data["login_time"] = datetime.now(timezone.utc)
+            data["login_time"] = datetime.now(UTC)
         item = await login_history_repository.create(session, data)
         if commit:
             await session.commit()
@@ -24,7 +24,7 @@ class LoginHistoryService:
     async def update_logout_record(self, session: AsyncSession, record_id: UUID, commit: bool = True):
         item = await self.get_history(session, record_id)
         if item.logout_time is None:
-            item = await login_history_repository.update(session, item, {"logout_time": datetime.now(timezone.utc)})
+            item = await login_history_repository.update(session, item, {"logout_time": datetime.now(UTC)})
             if commit:
                 await session.commit()
         return item
@@ -49,7 +49,7 @@ class AuditLogService:
         if not data["activity"].strip():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Activity cannot be empty")
         if data.get("activity_time") is None:
-            data["activity_time"] = datetime.now(timezone.utc)
+            data["activity_time"] = datetime.now(UTC)
         item = await audit_log_repository.create(session, data)
         if commit:
             await session.commit()
@@ -69,7 +69,7 @@ class AuditLogService:
         return await audit_log_repository.get_by_user(session, user_id, skip=skip, limit=limit)
 
     async def security_dashboard(self, session: AsyncSession) -> dict:
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         logins = await session.scalar(select(func.count(LoginHistory.id)).where(func.date(LoginHistory.login_time) == today))
         active = await session.scalar(select(func.count(LoginHistory.id)).where(LoginHistory.logout_time.is_(None)))
         logs = await session.scalar(select(func.count(AuditLog.id)).where(func.date(AuditLog.activity_time) == today))
@@ -87,7 +87,7 @@ class AuditLogService:
         return sorted(events, key=lambda event: event["activity_time"], reverse=True)
 
     async def login_statistics(self, session: AsyncSession) -> dict:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async def count_since(since):
             return (await session.scalar(select(func.count(LoginHistory.id)).where(LoginHistory.login_time >= since))) or 0
         week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)

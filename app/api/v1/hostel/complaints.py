@@ -1,13 +1,20 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.schemas.hostel_operations_schema import HostelComplaintCreate, HostelComplaintResponse, HostelComplaintUpdate, HostelComplaintSummaryResponse
-from app.services.hostel_operations_service import hostel_complaint_service
+
 from app.api.v1.auth.routes import get_current_user
-from app.models.user import User
+from app.core.database import get_db
 from app.models.student_model import Student
+from app.models.user import User
+from app.schemas.hostel_operations_schema import (
+    HostelComplaintCreate,
+    HostelComplaintResponse,
+    HostelComplaintSummaryResponse,
+    HostelComplaintUpdate,
+)
+from app.services.hostel_operations_service import hostel_complaint_service
 
 hostel_complaint_router = APIRouter()
 

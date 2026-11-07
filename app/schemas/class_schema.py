@@ -3,6 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from app.schemas.base import BaseSchema
 
 
@@ -10,18 +11,18 @@ class ClassCreate(BaseSchema):
     class_name: str = Field(..., min_length=1, max_length=100)
     section: str = Field(..., min_length=1, max_length=50)
     academic_year: str = Field(..., min_length=1, max_length=20)
-    class_teacher_id: Optional[UUID] = None
-    room_number: Optional[str] = Field(None, max_length=50)
-    status: Optional[str] = Field("ACTIVE", max_length=20)
+    class_teacher_id: UUID | None = None
+    room_number: str | None = Field(None, max_length=50)
+    status: str | None = Field("ACTIVE", max_length=20)
 
 
 class ClassUpdate(BaseSchema):
-    class_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    section: Optional[str] = Field(None, min_length=1, max_length=50)
-    academic_year: Optional[str] = Field(None, min_length=1, max_length=20)
-    class_teacher_id: Optional[UUID] = None
-    room_number: Optional[str] = Field(None, max_length=50)
-    status: Optional[str] = Field(None, max_length=20)
+    class_name: str | None = Field(None, min_length=1, max_length=100)
+    section: str | None = Field(None, min_length=1, max_length=50)
+    academic_year: str | None = Field(None, min_length=1, max_length=20)
+    class_teacher_id: UUID | None = None
+    room_number: str | None = Field(None, max_length=50)
+    status: str | None = Field(None, max_length=20)
 
 
 class ClassResponse(BaseModel):
@@ -31,9 +32,9 @@ class ClassResponse(BaseModel):
     class_name: str
     section: str
     academic_year: str
-    class_teacher_id: Optional[UUID] = None
-    room_number: Optional[str] = None
-    status: Optional[str] = "ACTIVE"
+    class_teacher_id: UUID | None = None
+    room_number: str | None = None
+    status: str | None = "ACTIVE"
     created_at: datetime
     updated_at: datetime
 

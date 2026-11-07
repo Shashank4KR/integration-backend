@@ -89,7 +89,7 @@ def test_finance_service_instances_exist():
 
 
 def test_fee_service_has_new_methods():
-    from app.services.fee_service import FeeStructureService, FeeInvoiceService, PaymentService
+    from app.services.fee_service import FeeInvoiceService, FeeStructureService, PaymentService
 
     assert hasattr(FeeStructureService, "get_by_academic_year")
     assert hasattr(FeeInvoiceService, "get_by_student")
@@ -110,10 +110,10 @@ def test_finance_repositories_exist():
         late_fee_rule_repository,
         other_income_repository,
         refund_request_repository,
+        scholarship_type_repository,
         student_category_repository,
         student_fee_assignment_repository,
         student_ledger_repository,
-        scholarship_type_repository,
         student_scholarship_repository,
     )
 
@@ -262,12 +262,13 @@ def test_finance_models_importable():
 
 @pytest.mark.asyncio
 async def test_generate_invoice():
-    from unittest.mock import AsyncMock, MagicMock
-    from uuid import uuid4
     from datetime import date
     from decimal import Decimal
-    from app.services.finance_service import finance_service
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+
     from app.services.fee_service import fee_invoice_service
+    from app.services.finance_service import finance_service
 
     invoice_id = uuid4()
     mock_invoice = MagicMock()

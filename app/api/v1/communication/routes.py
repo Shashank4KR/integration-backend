@@ -1,5 +1,6 @@
 import logging
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,9 +9,18 @@ logger = logging.getLogger(__name__)
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.models.communication_model import Announcement, Message, Notification
-from app.models.user import User
 from app.models.role import Role
-from app.schemas.communication_schema import AnnouncementCreate, AnnouncementResponse, AnnouncementUpdate, MessageCreate, MessageResponse, NotificationCreate, NotificationResponse, NotificationUpdate
+from app.models.user import User
+from app.schemas.communication_schema import (
+    AnnouncementCreate,
+    AnnouncementResponse,
+    AnnouncementUpdate,
+    MessageCreate,
+    MessageResponse,
+    NotificationCreate,
+    NotificationResponse,
+    NotificationUpdate,
+)
 from app.services.communication_service import announcement_service, message_service, notification_service
 from app.services.ownership_service import (
     check_message_ownership,
@@ -152,10 +162,11 @@ async def create_notification(
 ):
     _ensure_admin(current_user)
     if payload.audience:
+        from fastapi import HTTPException
+        from sqlalchemy import select
+
         from app.models.role import Role
         from app.models.user import User
-        from sqlalchemy import select
-        from fastapi import HTTPException
 
         aud = payload.audience.upper()
         if aud == "ALL":
@@ -192,7 +203,7 @@ async def create_notification(
             if first_notif is None:
                 first_notif = notif
         return first_notif
-    
+
     if not payload.user_id:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="user_id is required when audience is not specified")
@@ -282,7 +293,7 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
     sender_id = payload.sender_id or current_user.id
 
     target_val = (payload.recipient_id or payload.recipient or "").strip()
-    
+
     # Strip any role suffix like "(Student)", "(Teacher)", "(Librarian)"
     clean_target = target_val.split("(")[0].strip() if "(" in target_val else target_val
 
@@ -331,7 +342,7 @@ async def send_message(payload: MessageCreate, session: AsyncSession = Depends(g
             "LIBRARIANS": ["LIBRARIAN"],
             "STAFF": ["TEACHER", "ACCOUNTANT", "LIBRARIAN"],
         }
-        
+
         if role_key in aud_map:
             target_roles = aud_map[role_key]
             if target_roles is None:

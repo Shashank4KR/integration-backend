@@ -12,8 +12,8 @@ class TimetableCreate(BaseModel):
     day_of_week: str = Field(..., min_length=1, max_length=20)
     start_time: time
     end_time: time
-    room_no: Optional[str] = Field(None, max_length=50)
-    period_no: Optional[int] = None
+    room_no: str | None = Field(None, max_length=50)
+    period_no: int | None = None
 
     @model_validator(mode="after")
     def validate_time_range(self):
@@ -23,14 +23,14 @@ class TimetableCreate(BaseModel):
 
 
 class TimetableUpdate(BaseModel):
-    class_id: Optional[UUID] = None
-    subject_id: Optional[UUID] = None
-    teacher_id: Optional[UUID] = None
-    day_of_week: Optional[str] = Field(None, min_length=1, max_length=20)
-    start_time: Optional[time] = None
-    end_time: Optional[time] = None
-    room_no: Optional[str] = Field(None, max_length=50)
-    period_no: Optional[int] = None
+    class_id: UUID | None = None
+    subject_id: UUID | None = None
+    teacher_id: UUID | None = None
+    day_of_week: str | None = Field(None, min_length=1, max_length=20)
+    start_time: time | None = None
+    end_time: time | None = None
+    room_no: str | None = Field(None, max_length=50)
+    period_no: int | None = None
 
 
 class TimetableResponse(BaseModel):
@@ -43,7 +43,7 @@ class TimetableResponse(BaseModel):
     day_of_week: str
     start_time: time
     end_time: time
-    room_no: Optional[str] = None
-    period_no: Optional[int] = None
+    room_no: str | None = None
+    period_no: int | None = None
     created_at: datetime
     updated_at: datetime

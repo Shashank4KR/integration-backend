@@ -2,17 +2,18 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from app.schemas.base import BaseSchema
 
 
 class DepartmentCreate(BaseSchema):
     department_name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class DepartmentUpdate(BaseSchema):
-    department_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
+    department_name: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = None
 
 
 class DepartmentResponse(BaseModel):
@@ -20,4 +21,4 @@ class DepartmentResponse(BaseModel):
 
     id: UUID
     department_name: str
-    description: Optional[str] = None
+    description: str | None = None

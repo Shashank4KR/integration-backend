@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.student_model import Student
-from app.models.transport_model import Bus, Route, RouteStop, StudentTransport, Driver
+from app.models.transport_model import Bus, Driver, Route, RouteStop, StudentTransport
 from app.repositories.transport_repository import (
     bus_repository,
     driver_repository,

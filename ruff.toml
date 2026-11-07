@@ -1,0 +1,30 @@
+# Ruff configuration for EdTech Backend
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501", # Line length
+    "B008", # Do not perform function call in argument defaults (FastAPI Depends)
+    "B904", # Within an except clause, raise exceptions with from err
+    "F401", # Unused imports (avoid removing valid re-exports across models/schemas)
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["B", "E402", "F841"]
+"alembic/*" = ["E", "F", "I"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

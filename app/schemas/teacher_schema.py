@@ -3,21 +3,22 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from app.schemas.base import BaseSchema
 
 
 class TeacherCreate(BaseSchema):
     user_id: UUID
     employee_id: str = Field(..., min_length=1, max_length=50)
-    qualification: Optional[str] = Field(None, max_length=255)
-    department_id: Optional[UUID] = None
-    join_date: Optional[date] = None
-    phone: Optional[str] = Field(None, max_length=20)
-    address: Optional[str] = None
+    qualification: str | None = Field(None, max_length=255)
+    department_id: UUID | None = None
+    join_date: date | None = None
+    phone: str | None = Field(None, max_length=20)
+    address: str | None = None
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())
@@ -27,17 +28,17 @@ class TeacherCreate(BaseSchema):
 
 
 class TeacherUpdate(BaseSchema):
-    user_id: Optional[UUID] = None
-    employee_id: Optional[str] = Field(None, min_length=1, max_length=50)
-    qualification: Optional[str] = Field(None, max_length=255)
-    department_id: Optional[UUID] = None
-    join_date: Optional[date] = None
-    phone: Optional[str] = Field(None, max_length=20)
-    address: Optional[str] = None
+    user_id: UUID | None = None
+    employee_id: str | None = Field(None, min_length=1, max_length=50)
+    qualification: str | None = Field(None, max_length=255)
+    department_id: UUID | None = None
+    join_date: date | None = None
+    phone: str | None = Field(None, max_length=20)
+    address: str | None = None
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())
@@ -52,8 +53,8 @@ class TeacherResponse(BaseModel):
     id: UUID
     user_id: UUID
     employee_id: str
-    qualification: Optional[str] = None
-    department_id: Optional[UUID] = None
-    join_date: Optional[date] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
+    qualification: str | None = None
+    department_id: UUID | None = None
+    join_date: date | None = None
+    phone: str | None = None
+    address: str | None = None

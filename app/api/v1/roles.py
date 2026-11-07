@@ -1,11 +1,13 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.models.role import Role
+
 
 class RoleResponse(BaseModel):
     id: UUID
@@ -37,6 +39,7 @@ STANDARD_PERMISSIONS = [
 
 from app.api.v1.auth.routes import get_current_user
 from app.models.user import User
+
 
 @role_router.get("", response_model=list[RoleResponse])
 async def list_roles(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):

@@ -13,7 +13,7 @@ from app.models.student_model import Student
 from app.models.user import User
 from app.schemas.parent_schema import ParentCreate, ParentResponse, ParentUpdate
 from app.schemas.student_schema import StudentResponse
-from app.services.fee_service import fee_invoice_service, payment_service, _invoice_total_paid
+from app.services.fee_service import _invoice_total_paid, fee_invoice_service, payment_service
 from app.services.parent_service import parent_service
 
 router = build_crud_router(parent_service, ParentCreate, ParentUpdate, ParentResponse)

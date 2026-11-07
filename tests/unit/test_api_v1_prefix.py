@@ -1,5 +1,6 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 from app.main import app
 
 
@@ -30,7 +31,7 @@ async def test_api_v1_endpoints_and_legacy_compatibility():
 def test_openapi_schema_uses_api_v1_prefix():
     openapi_schema = app.openapi()
     paths = openapi_schema.get("paths", {})
-    
+
     # Verify modular paths are mounted under /api/v1/
     v1_paths = [p for p in paths.keys() if p.startswith("/api/v1/")]
     assert len(v1_paths) > 200, f"Expected > 200 paths under /api/v1/, found {len(v1_paths)}"

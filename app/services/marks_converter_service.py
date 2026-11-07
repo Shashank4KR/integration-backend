@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from datetime import UTC, datetime, timezone
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -148,7 +148,7 @@ async def convert_and_store(
         "status_note": result["status_note"],
         "source_title": result["source_title"],
         "reference_url": result["reference_url"],
-        "created_at": history.created_at or datetime.now(timezone.utc),
+        "created_at": history.created_at or datetime.now(UTC),
     }
 
 

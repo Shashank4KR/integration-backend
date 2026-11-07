@@ -1,5 +1,7 @@
-from app.repositories.crud_repository import CRUDRepository
 from app.models.hostel_operations_model import *
+from app.repositories.crud_repository import CRUDRepository
+
+
 class HostelVisitorRepository(CRUDRepository[HostelVisitor]): pass
 class HostelFeeStructureRepository(CRUDRepository[HostelFeeStructure]): pass
 class HostelFeeInvoiceRepository(CRUDRepository[HostelFeeInvoice]): pass

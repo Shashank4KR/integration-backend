@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -62,11 +62,11 @@ def _ensure_teacher_or_admin(current_user: User) -> None:
 
 
 def _check_attendance_correction_window(attendance: Attendance) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     created = attendance.created_at
     if created is not None:
         if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
+            created = created.replace(tzinfo=UTC)
         cutoff = created + timedelta(hours=settings.ATTENDANCE_CORRECTION_WINDOW_HOURS)
         if now > cutoff:
             raise HTTPException(

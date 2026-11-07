@@ -193,16 +193,16 @@ async def create_lesson_plan(
     )
 
 
-@router.get("/lesson-plans", response_model=List[LessonPlanResponse])
+@router.get("/lesson-plans", response_model=list[LessonPlanResponse])
 async def get_lesson_plans(
-    class_id: Optional[UUID] = Query(None),
-    subject_id: Optional[UUID] = Query(None),
-    chapter_name: Optional[str] = Query(None),
+    class_id: UUID | None = Query(None),
+    subject_id: UUID | None = Query(None),
+    chapter_name: str | None = Query(None),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     stmt = select(LessonPlan, Class, Subject, Teacher).join(Class, Class.id == LessonPlan.class_id).join(Subject, Subject.id == LessonPlan.subject_id).join(Teacher, Teacher.id == LessonPlan.teacher_id)
-    
+
     role_name = current_user.role.role_name.upper() if current_user.role else ""
     allowed_classes = await _accessible_class_ids(session, current_user)
     if role_name not in {"ADMIN", "TEACHER", "STUDENT", "PARENT"}:
@@ -217,7 +217,7 @@ async def get_lesson_plans(
         if not teacher_id:
             raise HTTPException(status_code=403, detail="Teacher profile not found")
         stmt = stmt.where(LessonPlan.teacher_id == teacher_id)
-            
+
     if class_id:
         stmt = stmt.where(LessonPlan.class_id == class_id)
     if subject_id:
@@ -363,23 +363,23 @@ async def create_content_resource(
     )
 
 
-@router.get("/content-resources", response_model=List[ContentResourceResponse])
+@router.get("/content-resources", response_model=list[ContentResourceResponse])
 async def get_content_resources(
-    class_id: Optional[UUID] = Query(None),
-    subject_id: Optional[UUID] = Query(None),
-    chapter_name: Optional[str] = Query(None),
+    class_id: UUID | None = Query(None),
+    subject_id: UUID | None = Query(None),
+    chapter_name: str | None = Query(None),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     stmt = select(ContentResource, Class, Subject).join(Class, Class.id == ContentResource.class_id).join(Subject, Subject.id == ContentResource.subject_id)
-    
+
     role_name = current_user.role.role_name.upper() if current_user.role else ""
     if role_name == "STUDENT":
         student_res = await session.execute(select(Student).where(Student.user_id == current_user.id))
         student = student_res.scalar_one_or_none()
         if student and student.class_id:
             stmt = stmt.where(ContentResource.class_id == student.class_id)
-            
+
     if class_id:
         stmt = stmt.where(ContentResource.class_id == class_id)
     if subject_id:
@@ -537,11 +537,11 @@ async def download_chapter_note_file(
     )
 
 
-@router.get("/chapter-notes", response_model=List[ChapterNoteResponse])
+@router.get("/chapter-notes", response_model=list[ChapterNoteResponse])
 async def get_chapter_notes(
-    class_id: Optional[UUID] = Query(None),
-    subject_id: Optional[UUID] = Query(None),
-    chapter_name: Optional[str] = Query(None),
+    class_id: UUID | None = Query(None),
+    subject_id: UUID | None = Query(None),
+    chapter_name: str | None = Query(None),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -659,9 +659,9 @@ async def create_student_feedback(
     )
 
 
-@router.get("/student-feedback", response_model=List[StudentFeedbackResponse])
+@router.get("/student-feedback", response_model=list[StudentFeedbackResponse])
 async def get_student_feedback(
-    student_id: Optional[UUID] = Query(None),
+    student_id: UUID | None = Query(None),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

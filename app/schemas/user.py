@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer, field_validator
+
 from app.schemas.base import BaseSchema
 
 
@@ -11,7 +12,7 @@ class RoleResponse(BaseModel):
 
     id: UUID
     role_name: str
-    description: Optional[str] = None
+    description: str | None = None
 
     @field_serializer("id")
     def serialize_role_id(self, value: UUID) -> str:
@@ -22,13 +23,13 @@ class UserCreate(BaseSchema):
     username: str = Field(..., min_length=1, max_length=255)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
-    phone: Optional[str] = Field(None, max_length=20)
+    phone: str | None = Field(None, max_length=20)
     status: bool = True
     role_id: str = Field(..., min_length=4, max_length=36)
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())
@@ -38,17 +39,17 @@ class UserCreate(BaseSchema):
 
 
 class UserUpdate(BaseSchema):
-    username: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    email: Optional[EmailStr] = None
-    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
-    phone: Optional[str] = Field(None, max_length=20)
-    avatar_url: Optional[str] = None
-    status: Optional[bool] = None
-    role_id: Optional[str] = Field(default=None, min_length=4, max_length=36)
+    username: str | None = Field(default=None, min_length=1, max_length=255)
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    phone: str | None = Field(None, max_length=20)
+    avatar_url: str | None = None
+    status: bool | None = None
+    role_id: str | None = Field(default=None, min_length=4, max_length=36)
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())
@@ -63,15 +64,15 @@ class UserResponse(BaseModel):
     id: UUID
     username: str
     email: EmailStr
-    phone: Optional[str] = None
-    avatar_url: Optional[str] = None
+    phone: str | None = None
+    avatar_url: str | None = None
     status: bool
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     must_change_password: bool = False
     role_id: UUID
-    role: Optional[RoleResponse] = None
+    role: RoleResponse | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     @field_serializer("role_id")
     def serialize_role_id(self, value: UUID) -> str:
@@ -79,5 +80,5 @@ class UserResponse(BaseModel):
 
 
 class UserCreateResponse(UserResponse):
-    created_id: Optional[UUID] = None
+    created_id: UUID | None = None
     message: str = "User created successfully"

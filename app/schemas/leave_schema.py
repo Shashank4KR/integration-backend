@@ -9,12 +9,12 @@ from app.models.leave_model import LeaveStatus
 
 class LeaveTypeCreate(BaseModel):
     leave_type_name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class LeaveTypeUpdate(BaseModel):
-    leave_type_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
+    leave_type_name: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = None
 
 
 class LeaveTypeResponse(BaseModel):
@@ -22,7 +22,7 @@ class LeaveTypeResponse(BaseModel):
 
     id: UUID
     leave_type_name: str
-    description: Optional[str] = None
+    description: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -36,14 +36,14 @@ class LeaveRequestCreate(BaseModel):
 
 
 class LeaveRequestUpdate(BaseModel):
-    leave_type_id: Optional[UUID] = None
-    from_date: Optional[date] = None
-    to_date: Optional[date] = None
-    reason: Optional[str] = Field(None, min_length=1)
+    leave_type_id: UUID | None = None
+    from_date: date | None = None
+    to_date: date | None = None
+    reason: str | None = Field(None, min_length=1)
 
 
 class LeaveApprovalRequest(BaseModel):
-    remarks: Optional[str] = None
+    remarks: str | None = None
 
 
 class LeaveRequestResponse(BaseModel):
@@ -57,7 +57,7 @@ class LeaveRequestResponse(BaseModel):
     reason: str
     status: LeaveStatus
     applied_on: datetime
-    approved_by: Optional[UUID] = None
+    approved_by: UUID | None = None
     created_at: datetime
     updated_at: datetime
 

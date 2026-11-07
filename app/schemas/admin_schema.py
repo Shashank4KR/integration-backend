@@ -7,11 +7,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class AdminCreate(BaseModel):
     user_id: UUID
     admin_name: str = Field(..., min_length=1, max_length=255)
-    phone: Optional[str] = Field(None, max_length=20)
+    phone: str | None = Field(None, max_length=20)
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())
@@ -21,13 +21,13 @@ class AdminCreate(BaseModel):
 
 
 class AdminUpdate(BaseModel):
-    user_id: Optional[UUID] = None
-    admin_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    phone: Optional[str] = Field(None, max_length=20)
+    user_id: UUID | None = None
+    admin_name: str | None = Field(None, min_length=1, max_length=255)
+    phone: str | None = Field(None, max_length=20)
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())
@@ -42,4 +42,4 @@ class AdminResponse(BaseModel):
     id: UUID
     user_id: UUID
     admin_name: str
-    phone: Optional[str] = None
+    phone: str | None = None

@@ -3,6 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from app.schemas.base import BaseSchema, ResponseSchema
 
 
@@ -97,7 +98,7 @@ class DriverCreate(BaseSchema):
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())
@@ -116,7 +117,7 @@ class DriverUpdate(BaseSchema):
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())

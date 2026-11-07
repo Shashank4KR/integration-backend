@@ -4,8 +4,8 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.department_model import Department
 from app.models.class_model import Class
+from app.models.department_model import Department
 from app.models.parent_model import Parent
 from app.models.student_model import Student
 from app.models.subject_model import Subject

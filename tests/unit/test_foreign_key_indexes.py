@@ -1,8 +1,10 @@
 import os
 import re
+
 import pytest
-from app.core.database import Base
+
 import app.models
+from app.core.database import Base
 
 
 def test_all_131_foreign_keys_have_indexes_in_migrations():
@@ -21,7 +23,7 @@ def test_all_131_foreign_keys_have_indexes_in_migrations():
     indexed_pairs = set()
     for fname in migration_files:
         fpath = os.path.join(migrations_dir, fname)
-        with open(fpath, "r", encoding="utf-8") as f:
+        with open(fpath, encoding="utf-8") as f:
             content = f.read()
         # Find all op.create_index('ix_table_col', 'table', ['col']
         matches = re.findall(r"op\.create_index\('[^']+',\s*'([^']+)',\s*\['([^']+)'\]", content)

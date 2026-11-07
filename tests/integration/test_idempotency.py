@@ -1,23 +1,24 @@
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import date
 from decimal import Decimal
-from typing import AsyncGenerator
+
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy import select, func
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.main import app
+from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
+from app.main import app
 from app.models.fee_model import FeeInvoice, FeeStructure, Payment
 from app.models.finance_model import Salary
+from app.models.idempotency_model import IdempotencyRecord
 from app.models.role import Role
 from app.models.student_model import Student
 from app.models.teacher_model import Teacher
 from app.models.user import User
-from app.models.idempotency_model import IdempotencyRecord
-from app.api.v1.auth.routes import get_current_user
 
 
 @pytest_asyncio.fixture

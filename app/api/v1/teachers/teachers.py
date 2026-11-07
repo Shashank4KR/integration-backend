@@ -11,8 +11,8 @@ from app.models.assignment_model import Assignment, AssignmentSubmission
 from app.models.class_model import Class
 from app.models.communication_model import Message
 from app.models.event_model import Event
-from app.models.exam_result_model import ExamResult
 from app.models.exam_model import Exam
+from app.models.exam_result_model import ExamResult
 from app.models.student_model import Student
 from app.models.subject_model import Subject
 from app.models.teacher_model import Teacher
@@ -180,7 +180,7 @@ async def get_teacher_pending_submissions(
     current_user: User = Depends(get_current_user),
 ):
     await _ensure_teacher_access(teacher_id, session, current_user)
-    from app.models.assignment_model import AssignmentSubmission, Assignment
+    from app.models.assignment_model import Assignment
     result = await session.execute(
         select(AssignmentSubmission, Assignment, Class, Student, Subject)
         .join(Assignment, Assignment.id == AssignmentSubmission.assignment_id)
@@ -271,7 +271,6 @@ async def get_teacher_events(
     current_user: User = Depends(get_current_user),
 ):
     await _ensure_teacher_access(teacher_id, session, current_user)
-    from app.models.event_model import Event
     result = await session.execute(
         select(Event)
         .where(Event.start_date >= func.current_date())

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -21,8 +21,8 @@ from app.schemas.settings_schema import ChangePasswordRequest, ProfileUpdateRequ
 from app.schemas.user import UserCreate, UserCreateResponse, UserResponse
 from app.services.audit_service import audit_log_service, login_history_service
 from app.services.auth_service import AuthService
-from app.services.totp_service import TOTPService
 from app.services.role_resolver import resolve_role
+from app.services.totp_service import TOTPService
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +32,8 @@ router = APIRouter()
 
 def _ensure_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 async def get_current_user(
@@ -157,7 +157,7 @@ async def login(
 
     # Check per-account lockout
     if user and user.locked_until:
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         if _ensure_utc(user.locked_until) > now_utc:
             remaining_mins = max(1, int((user.locked_until - now_utc).total_seconds() // 60) + 1)
             raise HTTPException(
@@ -171,7 +171,7 @@ async def login(
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= 5:
-                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+                user.locked_until = datetime.now(UTC) + timedelta(minutes=15)
                 logger.warning(f"User account '{user.username}' locked due to 5 consecutive failed login attempts.")
             db.add(user)
             await db.commit()
@@ -229,7 +229,7 @@ async def login(
             logger.warning(f"Error checking maintenance mode in login: {e}")
 
     # Reset failed login count and lockout on successful authentication
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     user.failed_login_attempts = 0
     user.locked_until = None
     user.last_login = now_utc
@@ -283,7 +283,7 @@ async def refresh_access_token(
     payload: RefreshTokenRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     token_hash = AuthService.hash_token(payload.refresh_token)
 
     result = await db.execute(

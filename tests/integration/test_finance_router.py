@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
 from app.api.v1.transport import transport_router
+from app.main import app
 
 
 @pytest.fixture

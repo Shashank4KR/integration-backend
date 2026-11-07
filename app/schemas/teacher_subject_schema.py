@@ -12,9 +12,9 @@ class TeacherSubjectCreate(BaseModel):
 
 
 class TeacherSubjectUpdate(BaseModel):
-    teacher_id: Optional[UUID] = None
-    subject_id: Optional[UUID] = None
-    class_id: Optional[UUID] = None
+    teacher_id: UUID | None = None
+    subject_id: UUID | None = None
+    class_id: UUID | None = None
 
 
 class TeacherSubjectResponse(BaseModel):

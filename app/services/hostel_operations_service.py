@@ -1,14 +1,17 @@
+import uuid as _py_uuid
 from datetime import date
 from decimal import Decimal
-import uuid as _py_uuid
+
 from fastapi import HTTPException
 from sqlalchemy import func, select
+
+from app.models.hostel_model import HostelAllocation, HostelAllocationStatus, HostelBed, HostelRoom
+from app.models.hostel_operations_model import *
 from app.models.student_model import Student
 from app.models.user import User
-from app.models.hostel_model import HostelAllocation, HostelRoom, HostelBed, HostelAllocationStatus
-from app.models.hostel_operations_model import *
 from app.repositories.hostel_operations_repository import *
 from app.services.crud_service import CRUDService
+
 PyUUID = _py_uuid.UUID
 def bad(s): raise HTTPException(400,s)
 class VisitorService(CRUDService):

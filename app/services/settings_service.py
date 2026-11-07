@@ -1,9 +1,9 @@
 from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.settings_model import SystemSetting
 from app.repositories.settings_repository import settings_repository
-
 
 DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
     "organization": {

@@ -11,8 +11,8 @@ class ClassSubjectCreate(BaseModel):
 
 
 class ClassSubjectUpdate(BaseModel):
-    class_id: Optional[UUID] = None
-    subject_id: Optional[UUID] = None
+    class_id: UUID | None = None
+    subject_id: UUID | None = None
 
 
 class ClassSubjectResponse(BaseModel):

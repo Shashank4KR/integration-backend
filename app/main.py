@@ -9,9 +9,9 @@ from fastapi.responses import JSONResponse
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, Base, engine
-from app.core.exceptions import register_exception_handlers, ResponseEnvelopeMiddleware
-from app.core.rate_limit import RateLimitMiddleware
+from app.core.exceptions import ResponseEnvelopeMiddleware, register_exception_handlers
 from app.core.logging import RequestIDMiddleware, setup_logging
+from app.core.rate_limit import RateLimitMiddleware
 from app.services.audit_service import audit_log_service
 from app.services.auth_service import AuthService
 

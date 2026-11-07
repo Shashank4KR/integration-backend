@@ -6,7 +6,9 @@ from decimal import Decimal
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.core.database import Base
+
 
 class HostelInvoiceStatus(str, enum.Enum): PENDING="PENDING"; PAID="PAID"; OVERDUE="OVERDUE"
 class MessAttendanceStatus(str, enum.Enum): PRESENT="PRESENT"; ABSENT="ABSENT"

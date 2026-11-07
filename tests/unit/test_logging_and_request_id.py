@@ -1,10 +1,11 @@
 import json
 import logging
-import pytest
-from httpx import AsyncClient, ASGITransport
 
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.core.logging import JSONFormatter, get_request_id, request_id_ctx_var
 from app.main import app
-from app.core.logging import JSONFormatter, request_id_ctx_var, get_request_id
 
 
 def test_json_formatter_structure_and_masking():

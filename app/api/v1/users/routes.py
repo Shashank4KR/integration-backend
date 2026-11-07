@@ -9,14 +9,14 @@ from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.user import User
-from app.services.ownership_service import check_user_ownership
-from app.services.role_resolver import resolve_role
 from app.schemas.user import (
     UserCreate,
     UserCreateResponse,
-    UserUpdate,
     UserResponse,
+    UserUpdate,
 )
+from app.services.ownership_service import check_user_ownership
+from app.services.role_resolver import resolve_role
 
 router = APIRouter()
 

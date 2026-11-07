@@ -1,6 +1,8 @@
 from uuid import UUID
+
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.communication_model import Announcement, Message, Notification
 from app.repositories.crud_repository import CRUDRepository
 

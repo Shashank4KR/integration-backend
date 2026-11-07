@@ -11,7 +11,11 @@ from app.api.v1.hostel.leaves import hostel_leave_router
 from app.api.v1.hostel.notices import hostel_notice_router
 from app.api.v1.hostel.operations import (
     fee_invoice_router as hostel_fee_invoice_router,
+)
+from app.api.v1.hostel.operations import (
     fee_structure_router as hostel_fee_structure_router,
+)
+from app.api.v1.hostel.operations import (
     hostel_extra_router,
     hostel_payment_router,
     maintenance_router,

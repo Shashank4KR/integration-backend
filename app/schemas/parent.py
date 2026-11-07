@@ -2,17 +2,18 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from app.schemas.base import BaseSchema
 
 
 class ParentBase(BaseSchema):
-    occupation: Optional[str] = Field(None, max_length=100)
-    phone: Optional[str] = Field(None, max_length=20)
-    address: Optional[str] = None
+    occupation: str | None = Field(None, max_length=100)
+    phone: str | None = Field(None, max_length=20)
+    address: str | None = None
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())
@@ -26,14 +27,14 @@ class ParentCreate(ParentBase):
 
 
 class ParentUpdate(BaseSchema):
-    user_id: Optional[UUID] = None
-    occupation: Optional[str] = Field(None, max_length=100)
-    phone: Optional[str] = Field(None, max_length=20)
-    address: Optional[str] = None
+    user_id: UUID | None = None
+    occupation: str | None = Field(None, max_length=100)
+    phone: str | None = Field(None, max_length=20)
+    address: str | None = None
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         if not v:
             return None
         cleaned = "".join(ch for ch in v if ch.isdigit())

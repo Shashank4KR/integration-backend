@@ -16,12 +16,12 @@ class ExamCreate(BaseModel):
 
 
 class ExamUpdate(BaseModel):
-    exam_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    exam_type: Optional[str] = Field(None, min_length=1, max_length=100)
-    class_id: Optional[UUID] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    max_marks: Optional[int] = Field(None, gt=0)
+    exam_name: str | None = Field(None, min_length=1, max_length=255)
+    exam_type: str | None = Field(None, min_length=1, max_length=100)
+    class_id: UUID | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    max_marks: int | None = Field(None, gt=0)
 
 
 class ExamResponse(BaseModel):
@@ -31,8 +31,8 @@ class ExamResponse(BaseModel):
     exam_name: str
     exam_type: str
     class_id: UUID
-    class_name: Optional[str] = None
-    section: Optional[str] = None
+    class_name: str | None = None
+    section: str | None = None
     start_date: date
     end_date: date
     max_marks: int
@@ -46,12 +46,12 @@ class ExamResultCreate(BaseModel):
     student_id: UUID
     subject_id: UUID
     marks_obtained: Decimal = Field(..., ge=0)
-    remarks: Optional[str] = None
+    remarks: str | None = None
 
 
 class ExamResultUpdate(BaseModel):
-    marks_obtained: Optional[Decimal] = Field(None, ge=0)
-    remarks: Optional[str] = None
+    marks_obtained: Decimal | None = Field(None, ge=0)
+    remarks: str | None = None
 
 
 class ExamResultResponse(BaseModel):
@@ -62,23 +62,23 @@ class ExamResultResponse(BaseModel):
     student_id: UUID
     subject_id: UUID
     marks_obtained: Decimal
-    grade: Optional[str] = None
-    remarks: Optional[str] = None
-    entered_by: Optional[UUID] = None
+    grade: str | None = None
+    remarks: str | None = None
+    entered_by: UUID | None = None
     created_at: datetime
     updated_at: datetime
 
 
 class ExamResultAuditOverride(BaseModel):
     marks_obtained: Decimal = Field(..., ge=0)
-    remarks: Optional[str] = None
+    remarks: str | None = None
     reason: str = Field(..., min_length=10, description="Mandatory audit justification")
 
 
 class ReportCardGenerate(BaseModel):
     student_id: UUID
     exam_id: UUID
-    remarks: Optional[str] = None
+    remarks: str | None = None
 
 
 class ReportCardResponse(BaseModel):
@@ -90,9 +90,9 @@ class ReportCardResponse(BaseModel):
     total_marks: Decimal
     obtained_marks: Decimal
     percentage: Decimal
-    rank: Optional[int] = None
+    rank: int | None = None
     result: str
-    remarks: Optional[str] = None
+    remarks: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -107,8 +107,8 @@ class StudentPerformanceSummary(BaseModel):
     student_id: UUID
     total_exams: int
     average_percentage: float
-    best_subject: Optional[str] = None
-    worst_subject: Optional[str] = None
+    best_subject: str | None = None
+    worst_subject: str | None = None
 
 
 class ExamSubjectCreate(BaseModel):
@@ -126,8 +126,8 @@ class ExamSubjectResponse(BaseModel):
 
 class ExamInvigilatorCreate(BaseModel):
     teacher_id: UUID
-    room_no: Optional[str] = None
-    invigilator_date: Optional[date] = None
+    room_no: str | None = None
+    invigilator_date: date | None = None
 
 
 class ExamInvigilatorResponse(BaseModel):
@@ -136,8 +136,8 @@ class ExamInvigilatorResponse(BaseModel):
     id: UUID
     exam_id: UUID
     teacher_id: UUID
-    room_no: Optional[str] = None
-    invigilator_date: Optional[date] = None
+    room_no: str | None = None
+    invigilator_date: date | None = None
     created_at: datetime
 
 
@@ -149,7 +149,7 @@ class ExamTimetableCreate(BaseModel):
     exam_date: date
     start_time: time
     end_time: time
-    room_no: Optional[str] = None
+    room_no: str | None = None
 
 
 class ExamTimetableResponse(BaseModel):
@@ -161,6 +161,6 @@ class ExamTimetableResponse(BaseModel):
     exam_date: date
     start_time: time
     end_time: time
-    room_no: Optional[str] = None
+    room_no: str | None = None
     created_at: datetime
 

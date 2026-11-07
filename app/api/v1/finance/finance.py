@@ -4,17 +4,13 @@ from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, Query, status
-from app.services.idempotency_service import IdempotencyService
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.models.student_model import Student
-from app.models.class_model import Class
-from app.models.parent_model import Parent
-from app.models.parent_student_model import ParentStudent
-from app.models.teacher_model import Teacher
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.core.exceptions import APIException, success_response
+from app.models.class_model import Class
 from app.models.fee_model import (
     FeeInvoice,
     FeeStructure,
@@ -26,12 +22,16 @@ from app.models.finance_model import (
     LateFeeRule,
     OtherIncome,
     RefundRequest,
+    ScholarshipType,
     StudentCategory,
     StudentFeeAssignment,
     StudentLedger,
     StudentScholarship,
-    ScholarshipType,
 )
+from app.models.parent_model import Parent
+from app.models.parent_student_model import ParentStudent
+from app.models.student_model import Student
+from app.models.teacher_model import Teacher
 from app.models.user import User
 from app.repositories.fee_repository import fee_invoice_repository, payment_repository
 from app.repositories.finance_repository import (
@@ -42,19 +42,19 @@ from app.repositories.finance_repository import (
     other_income_repository,
     refund_request_repository,
     salary_repository,
+    scholarship_type_repository,
     student_category_repository,
     student_fee_assignment_repository,
     student_ledger_repository,
-    scholarship_type_repository,
     student_scholarship_repository,
 )
 from app.schemas.fee_schema import (
-    FeeInvoiceCreate,
-    FeeInvoiceResponse,
-    FeeInvoiceUpdate,
     FeeInstallmentCreate,
     FeeInstallmentResponse,
     FeeInstallmentUpdate,
+    FeeInvoiceCreate,
+    FeeInvoiceResponse,
+    FeeInvoiceUpdate,
     FeeStructureCreate,
     FeeStructureResponse,
     FeeStructureUpdate,
@@ -69,13 +69,8 @@ from app.schemas.fee_schema import (
     StudentLedgerSummaryResponse,
 )
 from app.schemas.finance_schema import (
-    BulkAssignFeeRequest,
-    RefundApproveRequest,
-    RefundProcessRequest,
-    RefundRejectRequest,
-    ScholarshipApproveRequest,
-    ScholarshipRejectRequest,
     AdminDashboardResponse,
+    BulkAssignFeeRequest,
     ExpenseCategoryCreate,
     ExpenseCategoryResponse,
     ExpenseCategoryUpdate,
@@ -94,10 +89,18 @@ from app.schemas.finance_schema import (
     OtherIncomeUpdate,
     ParentDashboardResponse,
     ReceiptResponse,
+    RefundApproveRequest,
+    RefundProcessRequest,
+    RefundRejectRequest,
     RefundRequestCreate,
     RefundRequestResponse,
     RefundRequestUpdate,
     ReportPaginationParams,
+    SalaryCreate,
+    SalaryResponse,
+    SalaryUpdate,
+    ScholarshipApproveRequest,
+    ScholarshipRejectRequest,
     ScholarshipTypeCreate,
     ScholarshipTypeResponse,
     ScholarshipTypeUpdate,
@@ -106,9 +109,6 @@ from app.schemas.finance_schema import (
     StudentCategoryUpdate,
     StudentDashboardResponse,
     StudentScholarshipCreate,
-    SalaryCreate,
-    SalaryResponse,
-    SalaryUpdate,
     StudentScholarshipResponse,
     StudentScholarshipUpdate,
 )
@@ -116,10 +116,10 @@ from app.services.fee_service import (
     _invoice_total_paid,
     fee_invoice_service,
     fee_structure_service,
+    late_fee_rule_service,
     payment_service,
     refund_service,
     student_scholarship_service,
-    late_fee_rule_service,
 )
 from app.services.finance_service import (
     expense_category_service,
@@ -127,15 +127,12 @@ from app.services.finance_service import (
     finance_service,
     other_income_service,
     salary_service,
-    student_category_service,
-    student_ledger_service,
     scholarship_type_service,
+    student_category_service,
     student_fee_assignment_service,
+    student_ledger_service,
 )
-from app.repositories.finance_repository import (
-    student_fee_assignment_repository,
-    student_ledger_repository,
-)
+from app.services.idempotency_service import IdempotencyService
 
 
 def _get_user_role(current_user: User) -> str:

@@ -1,6 +1,6 @@
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import date
-from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio

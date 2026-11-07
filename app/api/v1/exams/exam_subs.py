@@ -1,17 +1,18 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy import select, delete
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
+from app.models.exam_models import ExamInvigilator, ExamSubject, ExamTimetable
 from app.models.user import User
-from app.models.exam_models import ExamSubject, ExamInvigilator, ExamTimetable
 from app.schemas.exam_schema import (
-    ExamSubjectCreate,
-    ExamSubjectResponse,
     ExamInvigilatorCreate,
     ExamInvigilatorResponse,
+    ExamSubjectCreate,
+    ExamSubjectResponse,
     ExamTimetableCreate,
     ExamTimetableResponse,
 )
@@ -44,6 +45,7 @@ async def list_exam_subjects(
 
 from pydantic import BaseModel
 
+
 class ExamSubjectBatch(BaseModel):
     subject_ids: list[UUID]
 
@@ -67,7 +69,7 @@ async def assign_exam_subject(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Subject already assigned to this exam"
         )
-    
+
     exam_sub = ExamSubject(exam_id=exam_id, subject_id=payload.subject_id)
     session.add(exam_sub)
     await session.commit()
@@ -128,7 +130,7 @@ async def assign_exam_invigilator(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invigilator already assigned to this exam"
         )
-    
+
     invigilator = ExamInvigilator(
         exam_id=exam_id,
         teacher_id=payload.teacher_id,
@@ -194,7 +196,7 @@ async def create_exam_timetable_entry(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Timetable entry for this subject already exists in this exam"
         )
-    
+
     timetable = ExamTimetable(
         exam_id=exam_id,
         subject_id=payload.subject_id,

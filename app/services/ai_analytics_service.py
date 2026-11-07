@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from datetime import UTC, datetime, timezone
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -33,7 +33,7 @@ class AIAnalyticsService:
             "predicted_grade": self._grade(performance_percentage),
             "learning_pattern": pattern,
             "recommendation": recommendation,
-            "generated_on": datetime.now(timezone.utc),
+            "generated_on": datetime.now(UTC),
         })
         await session.commit()
         return item
@@ -52,7 +52,7 @@ class AIAnalyticsService:
                 "predicted_grade": self._grade(performance_percentage),
                 "learning_pattern": pattern,
                 "recommendation": recommendation,
-                "generated_on": datetime.now(timezone.utc),
+                "generated_on": datetime.now(UTC),
             }))
         await session.commit()
         return generated
@@ -166,7 +166,7 @@ class AIChatHistoryService:
         if not data["question"].strip() or not data["response"].strip():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Question and response cannot be empty")
         if data.get("timestamp") is None:
-            data["timestamp"] = datetime.now(timezone.utc)
+            data["timestamp"] = datetime.now(UTC)
         item = await ai_chat_history_repository.create(session, data)
         await session.commit()
         return item
