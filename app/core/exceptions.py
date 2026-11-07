@@ -52,7 +52,6 @@ def _error_response(request: Request, status_code: int, message: str, errors: li
     return JSONResponse(
         status_code=status_code,
         content=payload,
-        headers={"X-Error": message},
     )
 
 
