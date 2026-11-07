@@ -66,8 +66,9 @@ async def test_convert_endpoint_returns_estimate_and_private_history(authenticat
     assert "estimate" in response.json()["status_note"].lower()
     history = await client.get("/marks-converter/history")
     assert history.status_code == 200
-    assert len(history.json()) == 1
-    assert history.json()[0]["target_marks"] == "64.00"
+    history_items = history.json().get("data", history.json()) if isinstance(history.json(), dict) else history.json()
+    assert len(history_items) == 1
+    assert history_items[0]["target_marks"] == "64.00"
     assert user.id is not None
 
 

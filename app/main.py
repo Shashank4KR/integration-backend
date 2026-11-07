@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, Base, engine
-from app.core.exceptions import register_exception_handlers
+from app.core.exceptions import register_exception_handlers, ResponseEnvelopeMiddleware
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.logging import RequestIDMiddleware, setup_logging
 from app.services.audit_service import audit_log_service
@@ -36,6 +36,7 @@ app = FastAPI(
 register_exception_handlers(app)
 
 app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
+app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 app.add_middleware(

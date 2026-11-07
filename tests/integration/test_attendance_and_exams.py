@@ -118,16 +118,17 @@ async def test_attendance_academic_year_filtering(async_client: AsyncClient, db_
     # 1. Fetch attendance with academic_year="2025-2026"
     resp_2025 = await async_client.get("/attendance", params={"academic_year": "2025-2026"})
     assert resp_2025.status_code == 200
-    records_2025 = resp_2025.json()
+    records_2025 = resp_2025.json().get("data", resp_2025.json()) if isinstance(resp_2025.json(), dict) else resp_2025.json()
     assert all(r["class_id"] == str(class_2025.id) for r in records_2025)
 
     # 2. Fetch attendance with academic_year="2024-2025"
     resp_2024 = await async_client.get("/attendance", params={"academic_year": "2024-2025"})
     assert resp_2024.status_code == 200
-    records_2024 = resp_2024.json()
+    records_2024 = resp_2024.json().get("data", resp_2024.json()) if isinstance(resp_2024.json(), dict) else resp_2024.json()
     assert all(r["class_id"] == str(class_2024.id) for r in records_2024)
 
     # 3. Fetch exams list endpoint works cleanly
     exams_resp = await async_client.get("/exams")
     assert exams_resp.status_code == 200
-    assert isinstance(exams_resp.json(), list)
+    exams_data = exams_resp.json().get("data", exams_resp.json()) if isinstance(exams_resp.json(), dict) else exams_resp.json()
+    assert isinstance(exams_data, list)

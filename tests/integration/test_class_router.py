@@ -75,6 +75,7 @@ async def test_get_class_subjects(async_client: AsyncClient, db_session: AsyncSe
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]["subject_name"] == "Mathematics"
-    assert data[0]["id"] == str(test_subject.id)
+    items = data.get("data", data) if isinstance(data, dict) else data
+    assert len(items) == 1
+    assert items[0]["subject_name"] == "Mathematics"
+    assert items[0]["id"] == str(test_subject.id)
