@@ -2,7 +2,7 @@ from datetime import date
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TeacherCreate(BaseModel):
@@ -14,6 +14,16 @@ class TeacherCreate(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     address: Optional[str] = None
 
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        cleaned = "".join(ch for ch in v if ch.isdigit())
+        if not cleaned:
+            raise ValueError("Phone number must contain only numeric digits (0-9)")
+        return cleaned
+
 
 class TeacherUpdate(BaseModel):
     user_id: Optional[UUID] = None
@@ -23,6 +33,16 @@ class TeacherUpdate(BaseModel):
     join_date: Optional[date] = None
     phone: Optional[str] = Field(None, max_length=20)
     address: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        cleaned = "".join(ch for ch in v if ch.isdigit())
+        if not cleaned:
+            raise ValueError("Phone number must contain only numeric digits (0-9)")
+        return cleaned
 
 
 class TeacherResponse(BaseModel):

@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class BusCreate(BaseModel):
@@ -87,6 +88,16 @@ class DriverCreate(BaseModel):
     driver_name: str
     license_number: str
     phone: str | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        cleaned = "".join(ch for ch in v if ch.isdigit())
+        if not cleaned:
+            raise ValueError("Phone number must contain only numeric digits (0-9)")
+        return cleaned
     experience: int | None = None
     bus_id: UUID | None = None
     status: str = "ACTIVE"
@@ -96,6 +107,16 @@ class DriverUpdate(BaseModel):
     driver_name: str | None = None
     license_number: str | None = None
     phone: str | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        cleaned = "".join(ch for ch in v if ch.isdigit())
+        if not cleaned:
+            raise ValueError("Phone number must contain only numeric digits (0-9)")
+        return cleaned
     experience: int | None = None
     bus_id: UUID | None = None
     status: str | None = None

@@ -1,10 +1,27 @@
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.hostel_operations_model import HostelInvoiceStatus, MaintenancePriority, MaintenanceStatus, MessAttendanceStatus, WorkOrderStatus, ComplaintStatus, NoticeStatus, LeaveApprovalStatus, HostelSettingKey
 class _Response(BaseModel): model_config=ConfigDict(from_attributes=True); id: UUID; created_at: datetime; updated_at: datetime
-class HostelVisitorCreate(BaseModel): student_id: UUID; visitor_name: str=Field(min_length=1); relation: str|None=None; phone: str=Field(min_length=1); check_in_time: datetime; check_out_time: datetime|None=None; approved_by: UUID|None=None
+class HostelVisitorCreate(BaseModel):
+    student_id: UUID
+    visitor_name: str=Field(min_length=1)
+    relation: str|None=None
+    phone: str=Field(min_length=1)
+    check_in_time: datetime
+    check_out_time: datetime|None=None
+    approved_by: UUID|None=None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str | None) -> str | None:
+        if not v:
+            return None
+        cleaned = "".join(ch for ch in v if ch.isdigit())
+        if not cleaned:
+            raise ValueError("Phone number must contain only numeric digits (0-9)")
+        return cleaned
 class HostelVisitorUpdate(BaseModel): visitor_name: str|None=Field(None,min_length=1); relation: str|None=None; phone: str|None=Field(None,min_length=1); check_in_time: datetime|None=None; check_out_time: datetime|None=None; approved_by: UUID|None=None
 class HostelVisitorResponse(HostelVisitorCreate,_Response): pass
 class HostelFeeStructureCreate(BaseModel): fee_type: str=Field(min_length=1); amount: Decimal=Field(gt=0); academic_year: str=Field(min_length=1); description: str|None=None

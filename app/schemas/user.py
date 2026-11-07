@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_serializer
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_serializer, field_validator
 
 
 class RoleResponse(BaseModel):
@@ -25,6 +25,16 @@ class UserCreate(BaseModel):
     status: bool = True
     role_id: str = Field(..., min_length=4, max_length=36)
 
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        cleaned = "".join(ch for ch in v if ch.isdigit())
+        if not cleaned:
+            raise ValueError("Phone number must contain only numeric digits (0-9)")
+        return cleaned
+
 
 class UserUpdate(BaseModel):
     username: Optional[str] = Field(default=None, min_length=1, max_length=255)
@@ -34,6 +44,16 @@ class UserUpdate(BaseModel):
     avatar_url: Optional[str] = None
     status: Optional[bool] = None
     role_id: Optional[str] = Field(default=None, min_length=4, max_length=36)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        cleaned = "".join(ch for ch in v if ch.isdigit())
+        if not cleaned:
+            raise ValueError("Phone number must contain only numeric digits (0-9)")
+        return cleaned
 
 
 class UserResponse(BaseModel):
