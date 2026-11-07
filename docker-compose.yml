@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: edtech_postgres
+    environment:
+      POSTGRES_USER: edtech_user
+      POSTGRES_PASSWORD: edtech_password
+      POSTGRES_DB: edtech_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edtech_user -d edtech_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - edtech_network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edtech_backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://edtech_user:edtech_password@db:5432/edtech_db
+      SECRET_KEY: dev-local-secret-key-change-in-production-only-32bytes
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      ENABLE_MFA: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - edtech_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  edtech_network:
+    driver: bridge
