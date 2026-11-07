@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+# TODO(ARCH-DECOMPOSE-1000L): This router exceeds 1400 lines and spans multiple distinct financial domains.
+# Decompose into dedicated sub-routers under app/api/v1/finance/:
+#   1. fee_structures.py   - Fee structure definitions and frequency management
+#   2. fee_invoices.py     - Invoice generation, bulk issuance, and status tracking
+#   3. payments.py         - Payment capture, cash/online reconciliation, and receipts
+#   4. late_fees.py        - Late fee rule configurations and calculations
+#   5. refunds.py          - Student fee refund requests and approval workflows
+#   6. scholarships.py     - Scholarship allocation, approval, and disbursements
+#   7. expenses.py         - Operational expense logging and categories
+
 from datetime import date
 from uuid import UUID
 

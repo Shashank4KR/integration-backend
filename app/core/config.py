@@ -6,6 +6,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
+# TODO(SECURITY-SECRETS-MANAGER): In production environments, replace direct .env / os.environ
+# configuration loading with a dedicated secrets manager provider (e.g. AWS Secrets Manager,
+# HashiCorp Vault, or Google Secret Manager). Secrets should be fetched at application startup
+# or rotated dynamically via IAM role authentication rather than baked into runtime environment variables.
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=str(_PROJECT_ROOT / ".env"),

@@ -425,6 +425,10 @@ async def delete_content_resource(
 
 # ==================== CHAPTER NOTES ====================
 
+# TODO(SECURITY-CLAMAV): Integrate asynchronous ClamAV daemon virus scanning (e.g. via pyclamd
+# or streaming unix/TCP socket to a dedicated clamd container) before writing uploaded file bytes
+# to persistent storage. Reject any file returning positive malware signature with HTTP 400 Bad Request
+# and log security telemetry event.
 @router.post("/chapter-notes/upload", response_model=ChapterNoteResponse, status_code=status.HTTP_201_CREATED)
 async def upload_chapter_note(
     class_id: UUID = Form(...),
