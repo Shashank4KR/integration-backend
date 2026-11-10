@@ -154,6 +154,12 @@ async def convert_and_store(
 
 def board_names(direction: BoardDirection, state: str) -> tuple[str, str]:
     state_board = f"{state.strip()} State Board"
-    if direction == BoardDirection.CBSE_TO_STATE:
-        return "CBSE", state_board
-    return state_board, "CBSE"
+    board_pairs = {
+        BoardDirection.CBSE_TO_STATE: ("CBSE", state_board),
+        BoardDirection.STATE_TO_CBSE: (state_board, "CBSE"),
+        BoardDirection.ICSE_TO_CBSE: ("ICSE / ISC", "CBSE"),
+        BoardDirection.CBSE_TO_ICSE: ("CBSE", "ICSE / ISC"),
+        BoardDirection.ICSE_TO_STATE: ("ICSE / ISC", state_board),
+        BoardDirection.STATE_TO_ICSE: (state_board, "ICSE / ISC"),
+    }
+    return board_pairs[direction]
