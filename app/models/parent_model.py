@@ -17,6 +17,10 @@ class Parent(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False
     )
+    parent_code: Mapped[str] = mapped_column(
+        String(16), unique=True, nullable=False,
+        default=lambda: f"P-{uuid.uuid4().hex[:8].upper()}",
+    )
     occupation: Mapped[str | None] = mapped_column(String(100), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)

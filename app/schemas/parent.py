@@ -48,3 +48,4 @@ class ParentResponse(ParentBase):
 
     id: UUID
     user_id: UUID
+    parent_code: str
