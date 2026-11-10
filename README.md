@@ -128,3 +128,16 @@ Build and run the production image:
 docker build -t edtech-backend:latest .
 docker run -p 8000:8000 --env-file .env edtech-backend:latest
 ```
+
+### Local superadmin demonstration account
+
+The optional demo account is disabled by default and is rejected unless the backend is running in `development` or `local` mode. To enable it, set these values in the backend's uncommitted `.env` file:
+
+```dotenv
+ENVIRONMENT=development
+ENABLE_DEMO_SUPERADMIN=true
+DEMO_SUPERADMIN_EMAIL=your-demo-email@example.com
+DEMO_SUPERADMIN_PASSWORD=use-a-local-demo-password-of-at-least-12-characters
+```
+
+Apply migrations, then restart the backend. Startup creates the account only if that email is unused; it hashes the password and assigns the existing `SUPER_ADMIN` role. Existing users are never promoted or have their password changed. Set `ENABLE_DEMO_SUPERADMIN=false` after the demo to block this account from new logins. Never enable this feature in production.

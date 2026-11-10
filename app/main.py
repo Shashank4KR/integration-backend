@@ -18,6 +18,10 @@ from app.services.auth_service import AuthService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.ENABLE_DEMO_SUPERADMIN:
+        from app.services.demo_superadmin_service import ensure_demo_superadmin
+
+        await ensure_demo_superadmin()
     yield
 
 

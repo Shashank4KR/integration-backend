@@ -67,6 +67,9 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
+    if user.username == "demo-superadmin" and not settings.demo_superadmin_active:
+        raise credentials_exception
+
     # Check token version to enforce revocation on logout / password change
     token_ver = payload.get("ver")
     if token_ver is not None and hasattr(user, "token_version") and user.token_version is not None:
@@ -154,6 +157,9 @@ async def login(
         )
     )
     user = result.scalar_one_or_none()
+
+    if user and user.username == "demo-superadmin" and not settings.demo_superadmin_active:
+        user = None
 
     # Check per-account lockout
     if user and user.locked_until:

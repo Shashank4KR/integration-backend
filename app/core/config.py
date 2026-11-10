@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     SECRET_KEY: str
     ALGORITHM: str
+    ENVIRONMENT: str = "production"
+    ENABLE_DEMO_SUPERADMIN: bool = False
+    DEMO_SUPERADMIN_EMAIL: str | None = None
+    DEMO_SUPERADMIN_PASSWORD: str | None = None
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENABLE_MFA: bool = False
@@ -29,6 +33,13 @@ class Settings(BaseSettings):
     ]
     ATTENDANCE_CORRECTION_WINDOW_HOURS: int = 24
     MARKS_CORRECTION_WINDOW_HOURS: int = 72
+
+    @property
+    def demo_superadmin_active(self) -> bool:
+        return self.ENABLE_DEMO_SUPERADMIN and self.ENVIRONMENT.lower() in {
+            "development",
+            "local",
+        }
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
