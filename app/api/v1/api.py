@@ -110,6 +110,7 @@ from app.api.v1.parents import (
 from app.api.v1.roles import permission_router, role_router
 from app.api.v1.settings import settings_router
 from app.api.v1.students import router as student_router
+from app.api.v1.superadmin.routes import router as superadmin_router
 from app.api.v1.teachers import (
     teacher_router,
     teacher_subject_router,
@@ -130,6 +131,7 @@ api_router = APIRouter()
 
 # Dashboard
 api_router.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"])
+api_router.include_router(superadmin_router, prefix="/superadmin", tags=["Superadmin"])
 
 # Users & Admins
 api_router.include_router(admin_router, prefix="/admins", tags=["Admins"])
