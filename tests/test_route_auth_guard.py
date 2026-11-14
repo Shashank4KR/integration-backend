@@ -8,12 +8,18 @@ PUBLIC_ALLOWLIST = {
     ("GET", "/health"),
     ("GET", "/api/v1/health"),
     ("POST", "/auth/login"),
+    ("POST", "/auth/forgot-password"),
+    ("POST", "/auth/reset-password"),
     ("POST", "/login"),
     ("POST", "/auth/refresh"),
     ("POST", "/refresh"),
     ("GET", "/settings/public/system-status"),
     ("POST", "/api/v1/auth/login"),
+    ("POST", "/api/v1/auth/forgot-password"),
+    ("POST", "/api/v1/auth/reset-password"),
     ("POST", "/api/v1/login"),
+    ("POST", "/api/v1/forgot-password"),
+    ("POST", "/api/v1/reset-password"),
     ("POST", "/api/v1/auth/refresh"),
     ("POST", "/api/v1/refresh"),
     ("GET", "/api/v1/settings/public/system-status"),
@@ -54,6 +60,7 @@ def test_route_auth_integrity():
     listed in the public allowlist:
       - GET /health
       - POST /auth/login
+      - POST /auth/forgot-password and /auth/reset-password
       - POST /login
       - GET /settings/public/system-status
     """

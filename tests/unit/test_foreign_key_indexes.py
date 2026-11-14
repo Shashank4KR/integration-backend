@@ -1,5 +1,5 @@
-import os
 import re
+from pathlib import Path
 
 import pytest
 
@@ -12,7 +12,7 @@ def test_all_131_foreign_keys_have_indexes_in_migrations():
 
     have corresponding CREATE INDEX statements across the migration files.
     """
-    migrations_dir = r"d:\updated\be\EdTech_backend\alembic\versions"
+    migrations_dir = Path(__file__).resolve().parents[2] / "alembic" / "versions"
     migration_files = [
         "c1a2b3c4d5e6_idx_core_users_and_academics.py",
         "c2b3c4d5e6f7_idx_content_communication_transport.py",
@@ -22,7 +22,7 @@ def test_all_131_foreign_keys_have_indexes_in_migrations():
 
     indexed_pairs = set()
     for fname in migration_files:
-        fpath = os.path.join(migrations_dir, fname)
+        fpath = migrations_dir / fname
         with open(fpath, encoding="utf-8") as f:
             content = f.read()
         # Find all op.create_index('ix_table_col', 'table', ['col']
