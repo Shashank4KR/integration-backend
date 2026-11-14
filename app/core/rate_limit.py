@@ -36,7 +36,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         client_ip: str = request.client.host if request.client else "unknown"
         now = time.monotonic()
-        is_auth = request.url.path.rstrip("/").lower() in {"/auth/login", "/login"}
+        is_auth = request.url.path.rstrip("/").lower() in {
+            "/auth/login", "/login", "/auth/forgot-password", "/forgot-password",
+            "/auth/reset-password", "/reset-password",
+        }
         token_subject = None
         authorization = request.headers.get("authorization", "")
         scheme, _, token = authorization.partition(" ")

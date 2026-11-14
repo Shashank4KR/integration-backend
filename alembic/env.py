@@ -30,6 +30,7 @@ from app.models import (
     LeaveType,
     LoginHistory,
     Parent,
+    PasswordReset,
     ParentStudent,
     Permission,
     Role,

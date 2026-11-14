@@ -1,8 +1,11 @@
 import logging
+import smtplib
+import secrets
+from email.message import EmailMessage
 from datetime import UTC, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.refresh_token_model import RefreshToken
+from app.models.password_reset import PasswordReset
 from app.models.user import User
 from app.schemas.auth_schema import (
     MFASetupResponse,
@@ -17,7 +21,7 @@ from app.schemas.auth_schema import (
     RefreshTokenRequest,
     TokenResponse,
 )
-from app.schemas.settings_schema import ChangePasswordRequest, ProfileUpdateRequest
+from app.schemas.settings_schema import ChangePasswordRequest, ForgotPasswordRequest, ResetPasswordRequest, ProfileUpdateRequest
 from app.schemas.user import UserCreate, UserCreateResponse, UserResponse
 from app.services.audit_service import audit_log_service, login_history_service
 from app.services.auth_service import AuthService
@@ -34,6 +38,32 @@ def _ensure_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC)
+
+
+def _validate_new_password(password: str) -> None:
+    if len(password) < 12 or not any(c.isalpha() for c in password) or not any(c.isdigit() for c in password):
+        raise HTTPException(status_code=400, detail="Password must be at least 12 characters and include a letter and a number")
+
+
+def _send_reset_email(email: str, url: str) -> None:
+    message = EmailMessage()
+    message["Subject"] = "Reset your Nomera password"
+    message["From"] = settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME or ""
+    message["To"] = email
+    message.set_content(f"Use this link within 30 minutes to reset your password:\n\n{url}\n\nIf you did not request this, ignore this email.")
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
+        if settings.SMTP_USE_TLS:
+            smtp.starttls()
+        if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
+            smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        smtp.send_message(message)
+
+
+def _deliver_reset_email(email: str, url: str) -> None:
+    try:
+        _send_reset_email(email, url)
+    except Exception:
+        logger.exception("Password reset email delivery failed")
 
 
 async def get_current_user(
@@ -498,14 +528,15 @@ async def change_password(
             detail="Incorrect current password",
         )
 
-    if len(new_password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password must be at least 6 characters long",
-        )
+    _validate_new_password(new_password)
+    if AuthService.verify_password(new_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="New password must be different from your current password")
+    if payload.confirm_password is not None and payload.confirm_password != new_password:
+        raise HTTPException(status_code=400, detail="New password and confirmation do not match")
 
     current_user.password_hash = AuthService.hash_password(new_password)
     current_user.must_change_password = False
+    current_user.password_changed_at = datetime.now(UTC)
 
     # Invalidate all existing tokens on password change
     current_user.token_version = (current_user.token_version or 1) + 1
@@ -528,6 +559,51 @@ async def change_password(
     )
     await db.commit()
     return {"message": "Password changed successfully"}
+
+
+@router.post("/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest, request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)) -> dict:
+    generic = {"message": "If an account exists for that email, password reset instructions will be sent."}
+    normalized_email = str(payload.email).strip().lower()
+    result = await db.execute(select(User).where(User.email.ilike(normalized_email), User.status.is_(True)))
+    user = result.scalar_one_or_none()
+    # Without a delivery channel, don't create a token that cannot be delivered.
+    if user is None or not (settings.SMTP_HOST and settings.SMTP_FROM_EMAIL):
+        return generic
+    raw_token = secrets.token_urlsafe(32)
+    reset = PasswordReset(user_id=user.id, token_hash=AuthService.hash_token(raw_token), expires_at=datetime.now(UTC) + timedelta(minutes=30))
+    await db.execute(update(PasswordReset).where(PasswordReset.user_id == user.id, PasswordReset.used_at.is_(None)).values(used_at=datetime.now(UTC)))
+    db.add(reset)
+    await db.commit()
+    background_tasks.add_task(_deliver_reset_email, user.email, f"{settings.FRONTEND_BASE_URL.rstrip('/')}/reset-password#token={raw_token}")
+    return generic
+
+
+@router.post("/reset-password")
+async def reset_password(payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)) -> dict:
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=400, detail="New password and confirmation do not match")
+    _validate_new_password(payload.new_password)
+    now = datetime.now(UTC)
+    token_hash = AuthService.hash_token(payload.token)
+    result = await db.execute(select(PasswordReset).where(PasswordReset.token_hash == token_hash).with_for_update())
+    reset = result.scalar_one_or_none()
+    if reset is None or reset.used_at is not None or _ensure_utc(reset.expires_at) <= now:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or expired. Request a new one.")
+    user = await db.get(User, reset.user_id)
+    if user is None or not user.status:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or expired. Request a new one.")
+    if AuthService.verify_password(payload.new_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="New password must be different from your current password")
+    user.password_hash = AuthService.hash_password(payload.new_password)
+    user.password_changed_at = now
+    user.must_change_password = False
+    user.token_version = (user.token_version or 1) + 1
+    reset.used_at = now
+    await db.execute(update(PasswordReset).where(PasswordReset.user_id == user.id, PasswordReset.id != reset.id, PasswordReset.used_at.is_(None)).values(used_at=now))
+    await db.execute(update(RefreshToken).where(RefreshToken.user_id == user.id).values(revoked=True))
+    await db.commit()
+    return {"message": "Password reset successfully. Please sign in with your new password."}
 
 
 @router.post("/mfa/setup", response_model=MFASetupResponse)

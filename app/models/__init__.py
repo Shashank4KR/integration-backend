@@ -80,6 +80,7 @@ from .leave_model import LeaveRequest, LeaveStatus, LeaveType
 from .library_model import Book, BookCategory, BookIssue, BookIssueStatus
 from .marks_converter_model import MarksConversionHistory, MarksConversionRule
 from .parent_model import Parent
+from .password_reset import PasswordReset
 from .parent_student_model import ParentStudent
 from .permission import Permission
 from .report_card_model import ReportCard

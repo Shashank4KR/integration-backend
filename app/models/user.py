@@ -44,6 +44,7 @@ class User(Base):
     token_version: Mapped[int] = mapped_column(
         Integer, default=1, server_default="1"
     )
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     mfa_secret: Mapped[str | None] = mapped_column(
         String(255), nullable=True
     )

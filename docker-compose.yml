@@ -19,6 +19,16 @@ services:
     networks:
       - edtech_network
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: edtech_mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+    networks:
+      - edtech_network
+
   backend:
     build:
       context: .
@@ -33,11 +43,18 @@ services:
       ENVIRONMENT: development
       LOG_LEVEL: INFO
       ENABLE_MFA: "false"
+      FRONTEND_BASE_URL: http://localhost:3000
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_FROM_EMAIL: noreply@nomera.local
+      SMTP_USE_TLS: "false"
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     restart: unless-stopped
     networks:
       - edtech_network

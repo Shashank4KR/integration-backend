@@ -45,6 +45,16 @@ class ChangePasswordRequest(BaseSchema):
     confirm_password: str | None = Field(None, max_length=128)
 
 
+class ForgotPasswordRequest(BaseSchema):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseSchema):
+    token: str = Field(..., min_length=32, max_length=256)
+    new_password: str = Field(..., min_length=1, max_length=128)
+    confirm_password: str = Field(..., min_length=1, max_length=128)
+
+
 class SessionRecordResponse(ResponseSchema):
     id: UUID
     user_id: UUID

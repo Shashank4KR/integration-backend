@@ -1,8 +1,10 @@
 import os
+import json
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -27,12 +29,19 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENABLE_MFA: bool = False
-    CORS_ORIGINS: list[str] = [
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
     ATTENDANCE_CORRECTION_WINDOW_HOURS: int = 24
     MARKS_CORRECTION_WINDOW_HOURS: int = 72
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM_EMAIL: str | None = None
+    SMTP_USE_TLS: bool = True
 
     @property
     def demo_superadmin_active(self) -> bool:
@@ -45,7 +54,12 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, value):
         if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
+            normalized = value.strip()
+            if normalized.startswith("["):
+                value = json.loads(normalized)
+            else:
+                value = normalized.split(",")
+            return [origin.strip() for origin in value if origin.strip()]
         return value
 
 
